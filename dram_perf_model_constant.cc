@@ -16,6 +16,21 @@ DramPerfModelConstant::DramPerfModelConstant(core_id_t core_id,
    m_total_queueing_delay(SubsecondTime::Zero()),
    m_total_access_latency(SubsecondTime::Zero())
 {
+/*
+	Initializing information of hardware solution for part of memory
+   */
+	fast_m_size = 4 * 1024;
+	tot_m_size = 20 * 1024;
+	seg_size = 1;
+	seg_num = fast_m_size / seg_size;
+	SRC = new SrcEntry*[seg_num];
+
+	for (UInt32 i = 0; i < seg_num; i++) {
+		SRC[i] = new SrcEntry();
+	}
+	
+
+
    m_dram_access_cost = SubsecondTime::FS() * static_cast<uint64_t>(TimeConverter<float>::NStoFS(Sim()->getCfg()->getFloat("perf_model/dram/latency"))); // Operate in fs for higher precision before converting to uint64_t/SubsecondTime
 
    if (Sim()->getCfg()->getBool("perf_model/dram/queue_model/enabled"))
@@ -62,6 +77,8 @@ DramPerfModelConstant::~DramPerfModelConstant()
    for (int i = 0; i < VAULT_NUM; i++) {
 	   delete vaults[i];
    }
+
+   delete [] SRC;
 }
 
 SubsecondTime
@@ -77,7 +94,16 @@ DramPerfModelConstant::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size,
 	myfile << "Constant Model# pkt_time: " << pkt_time.getNS() << " address: " << address << std::endl;
 	*/
 
+	UInt64 seg_tag = address >> 20; // seg: 1 MB
+	UInt32 src_n = seg_tag % seg_num;
+	UInt32 nth_seg = (seg_tag / seg_num) % 6;
 
+	bool src_miss = false;
+	if (nth_seg != SRC[src_n]->m_tag) {
+		src_miss = true;
+	}
+
+  	bool swap = SRC[src_n]->accessEntry(nth_seg);
 
 	UInt64 addr = address >> OFF_BIT;
 	int v_i, b_i, p_i;
@@ -86,6 +112,11 @@ DramPerfModelConstant::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size,
 	b_i = addr & ((1 << BANK_BIT) - 1);
 	addr = addr >> BANK_BIT;
 	p_i = addr & ((1 << PART_BIT) - 1);
+
+	if (swap) {
+		vaults[v_i]->writes++;
+		vaults[v_i]->reads++;
+	}
 
 	vaults[v_i]->reads++;
 	vaults[v_i]->parts[p_i]->reads++;

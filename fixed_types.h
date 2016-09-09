@@ -52,7 +52,7 @@ typedef SInt32 carbon_thread_t;
 #define C_VAULT_BIT 5
 
 #define VAULT_BIT 5
-#define BANK_BIT 4
+#define BANK_BIT 1
 #define PART_BIT 2
 #define OFF_BIT 5
 
@@ -63,7 +63,8 @@ typedef SInt32 carbon_thread_t;
 #define BLOCK_SIZE 1<<OFF_BIT
 
 const UInt32 StackedDramSize = 4 * 1024 * 1024; // KB
-const UInt32 StackedPageSize = 2; // KB
+const UInt32 StackedSetSize = 8; // KB
+const UInt32 StackedPageSize = 1984; //B
 const UInt32 StackedBlockSize = 64; // B
 const UInt32 StackedAssoc = 4;
 

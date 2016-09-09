@@ -34,6 +34,7 @@
    {
 	   public:
 
+
 		   struct DramStats {
 			   int reads;
 			   int writes;
@@ -42,16 +43,20 @@
 		   CacheSetInfoPageLRU* m_set_info;
 		   CacheSetPageLRU** m_set;
 
+		   UInt32 FHT[31]; // footprint history table
+
 		   UInt32 m_set_num;
 		   UInt32 m_associativity;
 		   UInt32 m_blocksize;
 		   UInt32 m_pagesize;
+
+		   std::ofstream log_file;
 		   
 		   StackedDramCacheCntlr(UInt32 set_num, UInt32 associativity, UInt32 blocksize, UInt32 pagesize);
 		   ~StackedDramCacheCntlr();
 
 		   void ProcessRequest(Core::mem_op_t mem_op_type, IntPtr address);
-		   bool SplitAddress(IntPtr address, UInt32 *set_n, IntPtr *page_tag);
+		   bool SplitAddress(IntPtr address, UInt32 *set_n, IntPtr *page_tag, IntPtr *page_offset);
 
 		friend class CacheCntlr;
    };

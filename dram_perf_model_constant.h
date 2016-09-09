@@ -7,6 +7,39 @@
 #include "subsecond_time.h"
 #include "dram_cntlr_interface.h"
 
+class SrcEntry {
+	public:
+		UInt32 m_tag;
+		UInt32 count;
+		UInt32 m_access[6];
+		SrcEntry() : m_tag(0), count(0) {
+			for (UInt32 i = 0; i < 6; i++) {
+				m_access[i] = 0;
+			}
+		}
+
+		bool accessEntry(UInt32 n) {
+			count++;
+			m_access[n]++;
+			if (count == 10) {
+				count = 0;
+				UInt32 max = 0, idx = 0;
+				for (int i = 0; i < 6; i++) {
+					if (m_access[i] > max) {
+						max = m_access[i];
+						idx = i;
+					}
+					m_access[i] = 0;
+				}
+				if (idx != m_tag) {
+					m_tag = idx;
+					return true;
+				}
+			}
+			return false;
+		}
+};
+
 class DramPerfModelConstant : public DramPerfModel
 {
    private:
@@ -17,6 +50,12 @@ class DramPerfModelConstant : public DramPerfModel
       SubsecondTime m_total_queueing_delay;
       SubsecondTime m_total_access_latency;
 
+
+	  UInt32 fast_m_size; // MB
+	  UInt32 tot_m_size; // MB
+	  UInt32 seg_size; // MB
+	  UInt32 seg_num;
+	  SrcEntry **SRC; // recording segments in fast entry
       	StackedDramVault* vaults[VAULT_NUM];
 
    public:

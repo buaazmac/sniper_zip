@@ -94,29 +94,40 @@ CacheSetPageLRU::updateReplacementIndex(UInt32 index)
 }
 
 void
-CacheSetPageLRU::updateReplacementIndexTag(UInt32 index, IntPtr tag)
+CacheSetPageLRU::updateReplacementIndexTag(UInt32 index, IntPtr tag, IntPtr pc, IntPtr offset, UInt32 footprint)
 {
+	CachePageInfo *page = m_cache_page_info_array[index];
 	//here we simulate the replacement process
-	m_cache_page_info_array[index]->setTag(tag);
+	page->setTag(tag);
+	page->setValidBits(footprint);
+	page->setDirtyBits(0);
+	page->setFootprint(0);
 	
 	//increase the stats
-	reads++;
+	//reads++;
 	writes++;
 
 	updateUsedInfo(tag);
 }
 
-bool
-CacheSetPageLRU::accessAttempt(IntPtr tag)
+UInt8
+CacheSetPageLRU::accessAttempt(Core::mem_op_t type, IntPtr tag, IntPtr offset)
 {
+	UInt8 res = 0;
+	UInt32 block_num = offset / StackedBlockSize;
 	//here we simulate the looking up process
 	reads++;
 	for (UInt32 i = 0; i < m_associativity; i++) {
-		
-		if (m_cache_page_info_array[i]->getTag() == tag) {
-			return true;
+		CachePageInfo *page = m_cache_page_info_array[i];
+		if (page->getTag() == tag) {
+			if (page->accessBlock(type, block_num)) {
+				res = 2;
+			} else {
+				res = 1;
+			}
+			break;
 		}
 	}
-	return false;
+	return res;
 }
 
