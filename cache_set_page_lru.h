@@ -4,6 +4,8 @@
 #include "cache_set.h"
 #include "cache_page_info.h"
 
+#include "core.h"
+
 #include <iostream>
 
 class CacheSetInfoPageLRU : public CacheSetInfo
@@ -29,16 +31,18 @@ class CacheSetPageLRU : public CacheSet
 
 		virtual UInt32 getReplacementIndex(CacheCntlr*);
 		virtual void updateReplacementIndex(UInt32);
-		void updateReplacementIndexTag(UInt32 index, IntPtr tag);
+		void updateReplacementIndexTag(UInt32 index, IntPtr tag, IntPtr pc, IntPtr offset, UInt32 footprint);
 
 		void updateUsedInfo(IntPtr tag);
 
-		bool accessAttempt(IntPtr tag);
+		UInt8 accessAttempt(Core::mem_op_t type, IntPtr tag, IntPtr offset);
 
 		int reads;
 		int writes;
+		//int acts;
 
 		UInt32 n_vault;
+		UInt32 n_bank;
 		UInt32 n_level;
 
 		CachePageInfo** m_cache_page_info_array;
