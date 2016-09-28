@@ -97,6 +97,7 @@ DramPerfModelConstant::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size,
 	UInt64 seg_tag = address >> 20; // seg: 1 MB
 	UInt32 src_n = seg_tag % seg_num;
 	UInt32 nth_seg = (seg_tag / seg_num) % 6;
+<<<<<<< HEAD
 
 	bool src_miss = false;
 	if (nth_seg != SRC[src_n]->m_tag) {
@@ -104,6 +105,15 @@ DramPerfModelConstant::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size,
 	}
 
   	int rst = SRC[src_n]->accessEntry(nth_seg);
+=======
+
+	bool src_miss = false;
+	if (nth_seg != SRC[src_n]->m_tag) {
+		src_miss = true;
+	}
+
+  	bool swap = SRC[src_n]->accessEntry(nth_seg);
+>>>>>>> 836c84e6a7ff8170f36181a0cb7498834a3da90d
 
 	UInt64 addr = address >> OFF_BIT;
 	int v_i, b_i, p_i;
@@ -113,12 +123,18 @@ DramPerfModelConstant::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size,
 	addr = addr >> BANK_BIT;
 	p_i = addr & ((1 << PART_BIT) - 1);
 
+<<<<<<< HEAD
 	//power model does no matter with hit
 	if (rst == 1 || rst == 3) {
 		vaults[v_i]->writes++;
 		vaults[v_i]->reads++;
 		vaults[v_i]->parts[p_i]->reads++;
 		vaults[v_i]->parts[p_i]->writes++;
+=======
+	if (swap) {
+		vaults[v_i]->writes++;
+		vaults[v_i]->reads++;
+>>>>>>> 836c84e6a7ff8170f36181a0cb7498834a3da90d
 	}
 
 	vaults[v_i]->reads++;

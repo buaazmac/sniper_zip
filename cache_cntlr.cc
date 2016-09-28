@@ -121,7 +121,8 @@ CacheMasterCntlr::~CacheMasterCntlr()
    }
 }
 
-StackedDramCacheCntlr *CacheCntlr::m_stacked_dram_cache(new StackedDramCacheCntlr(StackedDramSize/StackedPageSize/StackedAssoc, StackedAssoc, StackedBlockSize, StackedPageSize));
+//STACKED_LLC: initialize stacked dram cache controller
+StackedDramCacheCntlr *CacheCntlr::m_stacked_dram_cache(new StackedDramCacheCntlr(StackedDramSize/StackedSetSize, StackedAssoc, StackedBlockSize, StackedPageSize));
 
 CacheCntlr::CacheCntlr(MemComponent::component_t mem_component,
       String name,
@@ -171,7 +172,7 @@ CacheCntlr::CacheCntlr(MemComponent::component_t mem_component,
 	std::cout << "...Initializing Cache Controller: " << name << std::endl;
 
 	if (is_last_level_cache && m_stacked_dram_cache == NULL) {
-		UInt32 st_set_n = StackedDramSize / StackedPageSize / StackedAssoc;
+		UInt32 st_set_n = StackedDramSize / StackedSetSize;
 
 		std::cout << "......Is LLC, now make stacked dram cache: " << StackedDramSize << ", " << StackedPageSize << ", " << StackedAssoc << ", " << st_set_n << std::endl;
 
@@ -809,7 +810,7 @@ CacheCntlr::processShmemReqFromPrevCache(CacheCntlr* requester, Core::mem_op_t m
 
 #ifdef STACKED_LLC
 
-   if (!cache_hit && m_stacked_dram_cache != NULL) {
+   if (!cache_hit && !m_next_cache_cntlr) {
 	   m_stacked_dram_cache->ProcessRequest(mem_op_type, address);
    }
 

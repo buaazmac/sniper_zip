@@ -18,11 +18,17 @@ class SrcEntry {
 			}
 		}
 
+<<<<<<< HEAD
 		int accessEntry(UInt32 n) {
 			count++;
 			m_access[n]++;
 			bool hit = (n == m_tag);
 			bool swap = false;
+=======
+		bool accessEntry(UInt32 n) {
+			count++;
+			m_access[n]++;
+>>>>>>> 836c84e6a7ff8170f36181a0cb7498834a3da90d
 			if (count == 10) {
 				count = 0;
 				UInt32 max = 0, idx = 0;
@@ -35,6 +41,7 @@ class SrcEntry {
 				}
 				if (idx != m_tag) {
 					m_tag = idx;
+<<<<<<< HEAD
 					swap = true;
 				}
 			}
@@ -51,6 +58,12 @@ class SrcEntry {
 					return 0;
 				}
 			}
+=======
+					return true;
+				}
+			}
+			return false;
+>>>>>>> 836c84e6a7ff8170f36181a0cb7498834a3da90d
 		}
 };
 
