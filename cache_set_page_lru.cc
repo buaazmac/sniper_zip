@@ -124,6 +124,11 @@ CacheSetPageLRU::accessAttempt(Core::mem_op_t type, IntPtr tag, IntPtr offset)
 				res = 2;
 			} else {
 				res = 1;
+<<<<<<< HEAD
+				// reload block
+				writes++;
+=======
+>>>>>>> 836c84e6a7ff8170f36181a0cb7498834a3da90d
 			}
 			break;
 		}
