@@ -7,21 +7,30 @@
 #include "subsecond_time.h"
 #include "dram_cntlr_interface.h"
 
+#include "stacked_dram_cntlr.h"
+
 class SrcEntry {
 	public:
 		UInt32 m_tag;
 		UInt32 count;
 		UInt32 m_access[6];
-		SrcEntry() : m_tag(0), count(0) {
+		UInt32 start_address;
+		UInt32 swap_count;
+		SrcEntry(UInt32 seg_num) : m_tag(0), count(0) {
 			for (UInt32 i = 0; i < 6; i++) {
 				m_access[i] = 0;
 			}
+			start_address = (1 << 20) * seg_num;
+			// Every 32 access swap segments
+			swap_count = 32;
 		}
 
-		bool accessEntry(UInt32 n) {
+		int accessEntry(UInt32 n) {
 			count++;
 			m_access[n]++;
-			if (count == 10) {
+			bool hit = (n == m_tag);
+			bool swap = false;
+			if (count == swap_count) {
 				count = 0;
 				UInt32 max = 0, idx = 0;
 				for (int i = 0; i < 6; i++) {
@@ -33,10 +42,22 @@ class SrcEntry {
 				}
 				if (idx != m_tag) {
 					m_tag = idx;
-					return true;
+					swap = true;
 				}
 			}
-			return false;
+			if (hit) {
+				if (swap) {
+					return 3;
+				} else {
+					return 2;
+				}
+			} else {
+				if (swap) {
+					return 1;
+				} else {
+					return 0;
+				}
+			}
 		}
 };
 
@@ -56,7 +77,10 @@ class DramPerfModelConstant : public DramPerfModel
 	  UInt32 seg_size; // MB
 	  UInt32 seg_num;
 	  SrcEntry **SRC; // recording segments in fast entry
-      	StackedDramVault* vaults[VAULT_NUM];
+      //	StackedDramVault* vaults[VAULT_NUM];
+
+	  StackedDramPerfMem* m_dram_perf_model;
+
 
    public:
       DramPerfModelConstant(core_id_t core_id,

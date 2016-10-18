@@ -26,10 +26,10 @@ DramPerfModelConstant::DramPerfModelConstant(core_id_t core_id,
 	SRC = new SrcEntry*[seg_num];
 
 	for (UInt32 i = 0; i < seg_num; i++) {
-		SRC[i] = new SrcEntry();
+		SRC[i] = new SrcEntry(i);
 	}
 	
-
+	m_dram_perf_model = new StackedDramPerfMem(32, 128*1024, 16*1024, 8);
 
    m_dram_access_cost = SubsecondTime::FS() * static_cast<uint64_t>(TimeConverter<float>::NStoFS(Sim()->getCfg()->getFloat("perf_model/dram/latency"))); // Operate in fs for higher precision before converting to uint64_t/SubsecondTime
 
@@ -42,31 +42,11 @@ DramPerfModelConstant::DramPerfModelConstant(core_id_t core_id,
    registerStatsMetric("dram", core_id, "total-access-latency", &m_total_access_latency);
    registerStatsMetric("dram", core_id, "total-queueing-delay", &m_total_queueing_delay);
 	
-	std::ofstream myfile;
-	myfile.open ("DRAM_Access.txt");
-	myfile << "Simulation start" << std::endl;
-	myfile.close();
-
-	for (int i = 0; i < VAULT_NUM; i++) {
-		vaults[i] = new StackedDramVault();
-	}
 }
 
 DramPerfModelConstant::~DramPerfModelConstant()
 {
 
-	std::ofstream myfile;
-	myfile.open ("DRAM_Access.txt", std::ofstream::out | std::ofstream::app);
-
-	for (int i = 0; i < VAULT_NUM; i++) {
-		for (int j = 0; j < PART_NUM; j++) {
-			myfile << "dram_" << i << "_" << j << " " << vaults[i]->parts[j]->reads << " " << vaults[i]->parts[j]->writes << std::endl;
-		}
-	}
-
-	//myfile << "End." << std::endl;
-
-	myfile.close();
 
    if (m_queue_model)
    {
@@ -74,11 +54,9 @@ DramPerfModelConstant::~DramPerfModelConstant()
       m_queue_model = NULL;
    }
    
-   for (int i = 0; i < VAULT_NUM; i++) {
-	   delete vaults[i];
-   }
-
    delete [] SRC;
+
+   delete m_dram_perf_model;
 }
 
 SubsecondTime
@@ -88,46 +66,31 @@ DramPerfModelConstant::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size,
 	//std::cout << "Constant Model: " << "pkt_time: " << pkt_time << "address: " << address <<  std::endl;
 	//printf("Constant Model# pkt_time: %ld, address: %ld\n", pkt_time.getMS(), address);
 
-	/*
-	std::ofstream myfile;
-	myfile.open ("DRAM_Access.txt", std::ofstream::out | std::ofstream::app);
-	myfile << "Constant Model# pkt_time: " << pkt_time.getNS() << " address: " << address << std::endl;
-	*/
 
 	UInt64 seg_tag = address >> 20; // seg: 1 MB
 	UInt32 src_n = seg_tag % seg_num;
 	UInt32 nth_seg = (seg_tag / seg_num) % 6;
 
+	/*
 	bool src_miss = false;
 	if (nth_seg != SRC[src_n]->m_tag) {
 		src_miss = true;
-	}
+	} 
+	*/
 
-  	bool swap = SRC[src_n]->accessEntry(nth_seg);
+  	int rst = SRC[src_n]->accessEntry(nth_seg);
 
-	UInt64 addr = address >> OFF_BIT;
-	int v_i, b_i, p_i;
-	v_i = addr & ((1 << VAULT_BIT) - 1);
-	addr = addr >> VAULT_BIT;
-	b_i = addr & ((1 << BANK_BIT) - 1);
-	addr = addr >> BANK_BIT;
-	p_i = addr & ((1 << PART_BIT) - 1);
-
-	if (swap) {
-		vaults[v_i]->writes++;
-		vaults[v_i]->reads++;
-	}
-
-	vaults[v_i]->reads++;
-	vaults[v_i]->parts[p_i]->reads++;
-	StackedDramBank* bb = vaults[v_i]->parts[p_i]->banks[b_i];
-	bb->AccessOnce(0);
-
+	/*DEBUG*/
 	/*
-	myfile << "----access--v_" << v_i << "--b_" << b_i << "--p_" << p_i << ": " << bb->GetPower() << ", " << vaults[v_i]->parts[p_i]->reads << ", " << vaults[v_i]->reads << std::endl;
-
+	std::ofstream myfile;
+	myfile.open ("DRAM_Access_orig_2.txt", std::ofstream::out | std::ofstream::app);
+	myfile << "Constant Model# pkt_time: " << pkt_time.getNS() << " address: " << address << " --- " << (address >> OFF_BIT) << std::endl;
 	myfile.close();
 	*/
+
+    SubsecondTime model_delay = SubsecondTime::Zero();
+	SubsecondTime load_delay = SubsecondTime::Zero();
+
 
    // pkt_size is in 'Bytes'
    // m_dram_bandwidth is in 'Bits per clock cycle'
@@ -137,31 +100,37 @@ DramPerfModelConstant::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size,
       return SubsecondTime::Zero();
    }
 
-   SubsecondTime processing_time = m_dram_bandwidth.getRoundedLatency(8 * pkt_size); // bytes to bits
+   //Here we calculate time
+	// If swapping happens 
+	if (rst == 1 || rst == 3) {
+		// One segment read and write happend in stacked dram
+		UInt32 cur_addr = SRC[src_n]->start_address;
+		for (int i = 0; i < (1 << 7); i++) {
+			model_delay += m_dram_perf_model->getAccessLatency(pkt_time, pkt_size, cur_addr, DramCntlrInterface::READ);
+			model_delay += m_dram_perf_model->getAccessLatency(pkt_time, pkt_size, cur_addr, DramCntlrInterface::WRITE);
+			cur_addr += (1 << 13);
+		}
+		// Load 1 MB from slow memory
+		load_delay += m_dram_bandwidth.getRoundedLatency(1 << 23);
+	}
 
-   // Compute Queue Delay
-   SubsecondTime queue_delay;
-   if (m_queue_model)
-   {
-      queue_delay = m_queue_model->computeQueueDelay(pkt_time, processing_time, requester);
+   if (rst == 0 || rst == 1) { // not hit
+	   // Read data from slow memory
+		load_delay += m_dram_bandwidth.getRoundedLatency(8 * pkt_size); 
    }
-   else
-   {
-      queue_delay = SubsecondTime::Zero();
-   }
+   
+	model_delay += m_dram_perf_model->getAccessLatency(pkt_time, pkt_size, address, access_type);
 
-   SubsecondTime access_latency = queue_delay + processing_time + m_dram_access_cost;
+   SubsecondTime access_latency = model_delay + load_delay;
 
 
    perf->updateTime(pkt_time);
-   perf->updateTime(pkt_time + queue_delay, ShmemPerf::DRAM_QUEUE);
-   perf->updateTime(pkt_time + queue_delay + processing_time, ShmemPerf::DRAM_BUS);
-   perf->updateTime(pkt_time + queue_delay + processing_time + m_dram_access_cost, ShmemPerf::DRAM_DEVICE);
+   perf->updateTime(pkt_time + model_delay);
+   perf->updateTime(pkt_time + access_latency);
 
    // Update Memory Counters
    m_num_accesses ++;
    m_total_access_latency += access_latency;
-   m_total_queueing_delay += queue_delay;
 
    return access_latency;
 }
