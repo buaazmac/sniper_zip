@@ -22,7 +22,7 @@ class SrcEntry {
 			}
 			start_address = (1 << 20) * seg_num;
 			// Every 32 access swap segments
-			swap_count = 32;
+			swap_count = 20;
 		}
 
 		int accessEntry(UInt32 n) {
@@ -80,6 +80,8 @@ class DramPerfModelConstant : public DramPerfModel
       //	StackedDramVault* vaults[VAULT_NUM];
 
 	  StackedDramPerfMem* m_dram_perf_model;
+
+	  UInt32 tot_access, swap_times;
 
 
    public:

@@ -30,6 +30,10 @@ DramPerfModelConstant::DramPerfModelConstant(core_id_t core_id,
 	}
 	
 	m_dram_perf_model = new StackedDramPerfMem(32, 128*1024, 16*1024, 8);
+	
+	tot_access = swap_times = 0;
+
+	/*-----------------------------*/
 
    m_dram_access_cost = SubsecondTime::FS() * static_cast<uint64_t>(TimeConverter<float>::NStoFS(Sim()->getCfg()->getFloat("perf_model/dram/latency"))); // Operate in fs for higher precision before converting to uint64_t/SubsecondTime
 
@@ -53,6 +57,8 @@ DramPerfModelConstant::~DramPerfModelConstant()
      delete m_queue_model;
       m_queue_model = NULL;
    }
+
+   std::cout << "[EXTRA OUTPUT] Total Memory Request: " << tot_access << ", Swap Times: " << swap_times << std::endl;
    
    delete [] SRC;
 
@@ -102,7 +108,9 @@ DramPerfModelConstant::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size,
 
    //Here we calculate time
 	// If swapping happens 
+   tot_access ++;
 	if (rst == 1 || rst == 3) {
+		swap_times++;
 		// One segment read and write happend in stacked dram
 		UInt32 cur_addr = SRC[src_n]->start_address;
 		for (int i = 0; i < (1 << 7); i++) {

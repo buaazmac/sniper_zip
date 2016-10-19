@@ -25,6 +25,13 @@ StackedDramPerfMem::~StackedDramPerfMem()
 	myfile.open ("StackedDramMem.txt", std::ofstream::out | std::ofstream::app);
 	myfile << "Simulation start" << std::endl;
 
+	SubsecondTime tot_ACT, tot_PRE, tot_RD, tot_WR;
+	tot_ACT = tot_PRE = tot_RD = tot_WR = SubsecondTime::Zero();
+
+	UInt32 tot_access, tot_row_hits;
+
+	tot_access = tot_row_hits = 0;
+
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		VaultPerfModel* vault = m_vaults_array[i];
 		for (UInt32 j = 0; j < vault->n_banks; j++) {
@@ -33,9 +40,26 @@ StackedDramPerfMem::~StackedDramPerfMem()
 					<< bank->stats.tACT << " " 
 					<< bank->stats.tPRE << " " 
 					<< bank->stats.tRD << " " 
-					<< bank->stats.tWR << std::endl;
+					<< bank->stats.tWR << " "
+					<< bank->stats.reads << " "
+					<< bank->stats.writes << " "
+					<< bank->stats.row_hits << std::endl;
+
+			tot_ACT += bank->stats.tACT;
+			tot_PRE += bank->stats.tPRE;
+			tot_RD += bank->stats.tRD;
+			tot_WR += bank->stats.tWR;
+
+			tot_access += bank->stats.reads + bank->stats.writes;
+			tot_row_hits += bank->stats.row_hits;
 		}
 	}
+	float row_hit_rate = 0;
+	if (tot_access != 0) 
+		row_hit_rate = tot_row_hits / tot_access;
+
+	myfile << "Total time: " << tot_ACT << ", " << tot_PRE << ", " << tot_RD << ", " << tot_WR << std::endl;
+	myfile << "Total access: "  << tot_access << ", Row Hit Rate: " << row_hit_rate << std::endl;
 	//myfile << "End." << std::endl;
 	myfile.close();
 
@@ -103,6 +127,9 @@ StackedDramPerfCache::~StackedDramPerfCache()
 
 	myfile << "Simulation start" << std::endl;
 
+	SubsecondTime tot_ACT, tot_PRE, tot_RD, tot_WR;
+	tot_ACT = tot_PRE = tot_RD = tot_WR = SubsecondTime::Zero();
+
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		VaultPerfModel* vault = m_vaults_array[i];
 		for (UInt32 j = 0; j < vault->n_banks; j++) {
@@ -112,8 +139,13 @@ StackedDramPerfCache::~StackedDramPerfCache()
 					<< bank->stats.tPRE << " " 
 					<< bank->stats.tRD << " " 
 					<< bank->stats.tWR << std::endl;
+			tot_ACT += bank->stats.tACT;
+			tot_PRE += bank->stats.tPRE;
+			tot_RD += bank->stats.tRD;
+			tot_WR += bank->stats.tWR;
 		}
 	}
+	myfile << "Total time: " << tot_ACT << ", " << tot_PRE << ", " << tot_RD << ", " << tot_WR << std::endl;
 	myfile.close();
 
 	// DEBUG

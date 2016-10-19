@@ -6,6 +6,7 @@ BankPerfModel::BankPerfModel(UInt32 bank_size, UInt32 row_size)
 {
 	// Initialize performance statistic
 	stats.tACT = stats.tPRE = stats.tRD = stats.tWR = SubsecondTime::Zero();
+	stats.reads = stats.writes = stats.row_hits = 0;
 
 	// Initialize current command state: precharge
 	cur_cmd = Command::PRE;
@@ -22,6 +23,9 @@ BankPerfModel::BankPerfModel(UInt32 bank_size, UInt32 row_size)
 	}
 	// Initialize timing stats
 	init_timing();
+
+	// Set current open row to -1
+	cur_open_row = -1;
 }
 
 BankPerfModel::~BankPerfModel()
@@ -67,6 +71,7 @@ BankPerfModel::processCommand(Command cmd, UInt32 row_i, SubsecondTime cmd_time)
 		case ACT:
 			stats.tACT += cmd_latency;
 			m_row_state[row_i] = Openned;
+			cur_open_row = row_i;
 			break;
 		case PRE:
 			stats.tPRE += cmd_latency;
@@ -74,9 +79,17 @@ BankPerfModel::processCommand(Command cmd, UInt32 row_i, SubsecondTime cmd_time)
 			break;
 		case RD:
 			stats.tRD += cmd_latency;
+			stats.reads ++;
+			if (cur_open_row == row_i) {
+				stats.row_hits++;
+			}
 			break;
 		case WR:
 			stats.tWR += cmd_latency;
+			stats.writes ++;
+			if (cur_open_row == row_i) {
+				stats.row_hits++;
+			}
 			break;
 		default:
 			break;

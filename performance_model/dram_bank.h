@@ -21,6 +21,8 @@ class BankPerfModel {
 		UInt32 m_bank_size;
 		UInt32 m_row_size;
 		UInt32 n_rows;
+
+		UInt32 cur_open_row;
 		Command cur_cmd;
 		SubsecondTime cur_time, tot_time;
 		enum RowState {
@@ -32,6 +34,9 @@ class BankPerfModel {
 			SubsecondTime tPRE;
 			SubsecondTime tRD;
 			SubsecondTime tWR;
+			UInt32 reads;
+			UInt32 writes;
+			UInt32 row_hits;
 		} stats;
 		// Timing
 		struct TimingEntry {

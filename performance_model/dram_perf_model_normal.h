@@ -128,7 +128,8 @@ class StackDramCacheCntlr
 		struct DramStats {
 			int reads;
 			int writes;
-		} dram_stats[32][4];
+			double misses;
+		} dram_stats[32];
 
 		DramCacheSetInfoUnison* m_set_info;
 		DramCacheSetUnison** m_set;
@@ -139,6 +140,11 @@ class StackDramCacheCntlr
 		UInt32 m_associativity;
 		UInt32 m_blocksize;
 		UInt32 m_pagesize;
+
+		UInt32 m_vault_num;
+		UInt32 m_vault_size;
+		UInt32 m_bank_size;
+		UInt32 m_row_size;
 
 		//Performance model
 		StackedDramPerfCache* m_dram_perf_model;

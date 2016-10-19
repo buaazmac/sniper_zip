@@ -256,15 +256,19 @@ StackDramCacheCntlr::StackDramCacheCntlr(
 	}
 
 	for (UInt32 i = 0; i < 32; i++) {
-		for (UInt32 j = 0; j < 4; j++) {
-			dram_stats[i][j].reads = 0;
-			dram_stats[i][j].writes = 0;
-		}
+		dram_stats[i].reads = 0;
+		dram_stats[i].writes = 0;
+		dram_stats[i].misses = 0;
 	}
 
 	// Initialize dram performance model
 	// we have 32 vaults, 1 vault = 128 mb, 1 bank = 16 mb, 1 row = 8 kb
-	m_dram_perf_model = new StackedDramPerfCache(32, 128 * 1024, 16 * 1024, 8);
+	m_vault_num = 32;
+	m_vault_size = 128 * 1024;
+	m_bank_size = 16 * 1024;
+	m_row_size = 8;
+
+	m_dram_perf_model = new StackedDramPerfCache(m_vault_num, m_vault_size, m_bank_size, m_row_size);
 }
 
 StackDramCacheCntlr::~StackDramCacheCntlr()
@@ -276,18 +280,34 @@ StackDramCacheCntlr::~StackDramCacheCntlr()
 
 	myfile << "Simulation start" << std::endl;
 
-	for (UInt32 i = 0; i < m_set_num; i++) {
-		UInt32 vn = m_set[i]->n_vault, ln = m_set[i]->n_level;
-		dram_stats[vn][ln].reads += m_set[i]->reads;
-		dram_stats[vn][ln].writes += m_set[i]->writes;
-	}
+	UInt32 tot_access = 0, tot_miss = 0;
+	float miss_rate;
 
 	for (UInt32 i = 0; i < 32; i++) {
-		for (UInt32 j = 0; j < 4; j++) {
-			myfile << "dram_cache_" << i << "_" << j << " " << dram_stats[i][j].reads << " " << dram_stats[i][j].writes << std::endl;
-		}
+		UInt32 i_access = dram_stats[i].reads + dram_stats[i].writes;
+		if (i_access != 0) 
+			miss_rate = dram_stats[i].misses / i_access;
+		else
+			miss_rate = 0;
+		myfile << "dram_cache_" << i << ", access: " << i_access 
+			<< ", miss: " << dram_stats[i].misses << ", miss rate: " << miss_rate 
+			<< std::endl;
+		tot_access += i_access;
+		tot_miss += dram_stats[i].misses;
 	}
+
+	if (tot_access != 0) 
+		miss_rate = tot_miss / tot_access;
+	else
+		miss_rate = 0;
+	myfile << "dram_cache_total access: " << tot_access 
+		<< ", miss: " << tot_miss << ", miss rate: " << miss_rate 
+		<< std::endl;
 	myfile.close();
+
+	std::cout << "[EXTRA OUTPUT] DRAM Total Access: " << tot_access 
+		<< ", miss: " << tot_miss << ", miss rate: " << miss_rate 
+		<< std::endl;
 
 	delete m_set_info;
 	delete [] m_set;
@@ -298,12 +318,6 @@ StackDramCacheCntlr::~StackDramCacheCntlr()
 SubsecondTime
 StackDramCacheCntlr::ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::access_t access_type, IntPtr address)
 {
-	Core::mem_op_t mem_op_type;
-	if (access_type == DramCntlrInterface::READ) {
-		mem_op_type = Core::READ;
-	} else {
-		mem_op_type = Core::WRITE;
-	}
 	SubsecondTime model_delay = SubsecondTime::Zero();
 	SubsecondTime dram_delay = SubsecondTime::Zero();
 	UInt32 set_n;
@@ -320,6 +334,12 @@ StackDramCacheCntlr::ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::
 
 	UInt8 block_num = page_offset / m_blocksize;
 	footprint = FHT[block_num];
+
+	Core::mem_op_t mem_op_type;
+	if (access_type == DramCntlrInterface::WRITE) 
+		mem_op_type = Core::WRITE;
+	else
+		mem_op_type = Core::READ;
 
 	UInt8 hit = m_set[set_n]->accessAttempt(mem_op_type, page_tag, page_offset);
 
@@ -363,29 +383,25 @@ StackDramCacheCntlr::ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::
 	} 
 
 	dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 32, set_n, access_type); 
-	if (mem_op_type == Core::READ) {
-		// read data from the page
-		m_set[set_n]->reads++;
-
-		// read a page
-	    //model_delay += m_dram_bandwidth.getRoundedLatency(1984);
-	} else if (mem_op_type == Core::READ_EX) {
-		// read data from the page
-		m_set[set_n]->reads++;
-
-		// read a page
-	    //model_delay += m_dram_bandwidth.getRoundedLatency(1984);
-	} else if (mem_op_type == Core::WRITE) {
-		// write data to the page
-		m_set[set_n]->writes++;
-		
-		// write a page
-	    //model_delay += m_dram_bandwidth.getRoundedLatency(1984);
-	    //model_delay += m_dram_bandwidth.getRoundedLatency(1984);
-	} else {
-	}
 
 	model_delay += dram_delay;
+
+	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
+	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
+	UInt32 vault_i = set_n >> bank_bit >> row_bit;
+
+
+	if (access_type == DramCntlrInterface::WRITE) {
+		dram_stats[vault_i].writes ++;
+		if (hit == 0 || hit == 1) {
+			dram_stats[vault_i].misses ++;
+		}
+	} else {
+		dram_stats[vault_i].reads ++;
+		if (hit == 0 || hit == 1) {
+			dram_stats[vault_i].misses ++;
+		}
+	}
 
 	return model_delay;
 }
