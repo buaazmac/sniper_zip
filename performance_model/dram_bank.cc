@@ -71,7 +71,6 @@ BankPerfModel::processCommand(Command cmd, UInt32 row_i, SubsecondTime cmd_time)
 		case ACT:
 			stats.tACT += cmd_latency;
 			m_row_state[row_i] = Openned;
-			cur_open_row = row_i;
 			break;
 		case PRE:
 			stats.tPRE += cmd_latency;
@@ -83,6 +82,7 @@ BankPerfModel::processCommand(Command cmd, UInt32 row_i, SubsecondTime cmd_time)
 			if (cur_open_row == row_i) {
 				stats.row_hits++;
 			}
+			cur_open_row = row_i;
 			break;
 		case WR:
 			stats.tWR += cmd_latency;
@@ -90,6 +90,7 @@ BankPerfModel::processCommand(Command cmd, UInt32 row_i, SubsecondTime cmd_time)
 			if (cur_open_row == row_i) {
 				stats.row_hits++;
 			}
+			cur_open_row = row_i;
 			break;
 		default:
 			break;

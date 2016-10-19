@@ -286,7 +286,7 @@ StackDramCacheCntlr::~StackDramCacheCntlr()
 	for (UInt32 i = 0; i < 32; i++) {
 		UInt32 i_access = dram_stats[i].reads + dram_stats[i].writes;
 		if (i_access != 0) 
-			miss_rate = dram_stats[i].misses / i_access;
+			miss_rate = (float)dram_stats[i].misses / (float)i_access;
 		else
 			miss_rate = 0;
 		myfile << "dram_cache_" << i << ", access: " << i_access 
@@ -297,7 +297,7 @@ StackDramCacheCntlr::~StackDramCacheCntlr()
 	}
 
 	if (tot_access != 0) 
-		miss_rate = tot_miss / tot_access;
+		miss_rate = (float)tot_miss / (float)tot_access;
 	else
 		miss_rate = 0;
 	myfile << "dram_cache_total access: " << tot_access 
