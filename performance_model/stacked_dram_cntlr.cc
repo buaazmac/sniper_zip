@@ -22,7 +22,7 @@ StackedDramPerfMem::StackedDramPerfMem(UInt32 vaults_num, UInt32 vault_size, UIn
 StackedDramPerfMem::~StackedDramPerfMem()
 {
 	std::ofstream myfile;
-	myfile.open ("StackedDramMem.txt", std::ofstream::out | std::ofstream::app);
+	myfile.open ("StackedDramMem.txt");
 	myfile << "Simulation start" << std::endl;
 
 	SubsecondTime tot_ACT, tot_PRE, tot_RD, tot_WR;
@@ -92,13 +92,18 @@ StackedDramPerfMem::getAccessLatency(
 
 	VaultPerfModel* vault = m_vaults_array[v_i];
 	UInt32 bank_i = p_i * 2 + b_i;
+	// we have 2k rows each bank
 	UInt32 row_i = (addr >> floorLog2(m_row_size)) & ((1UL << 11) -1 );
 
 	SubsecondTime process_time = SubsecondTime::Zero();
 
 	//debug
-	log_file  << ", bank_i: " << bank_i 
+#ifdef LOG_OUTPUT
+	log_file  << "address: " << address
+			  << ", vault_i: " << v_i 
+			  << ", bank_i: " << bank_i 
 			  << ", row_i: " << row_i << std::endl;
+#endif
 	
 	process_time += vault->processRequest(pkt_time, access_type, bank_i, row_i);
 
@@ -173,25 +178,30 @@ SubsecondTime
 StackedDramPerfCache::getAccessLatency(
 						SubsecondTime pkt_time, 
 						UInt32 pkt_size, 
-						IntPtr set_i, 
+						UInt32 set_i, 
 						DramCntlrInterface::access_t access_type)
 {
+	UInt32 vault_bit = floorLog2(n_vaults);
 	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
 	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
 
+#ifdef LOG_OUTPUT
 	log_file << "m_vault_size: " << m_vault_size
 			 << "m_bank_size: " << m_bank_size
 			  << ", bank_bit: " << bank_bit 
 			  << ", row_bit: " << row_bit << std::endl;
+#endif
 
-	UInt32 vault_i = set_i >> bank_bit >> row_bit;
-	UInt32 bank_i = (set_i >> row_bit) & ((1UL << bank_bit) - 1); 
+	UInt32 vault_i = (set_i >> row_bit) & ((1UL << vault_bit) - 1);
+	UInt32 bank_i = set_i >> row_bit >> vault_bit; 
 	UInt32 row_i = set_i & ((1UL << row_bit) - 1);
 	//debug
+#ifdef LOG_OUTPUT
 	log_file << "Set num: " << set_i 
 			  << ", vault_i: " << vault_i
 			  << ", bank_i: " << bank_i 
 			  << ", row_i: " << row_i << std::endl;
+#endif
 	
 	VaultPerfModel* vault = m_vaults_array[vault_i];
 
@@ -199,4 +209,41 @@ StackedDramPerfCache::getAccessLatency(
 
 	process_latency += vault->processRequest(pkt_time, access_type, bank_i, row_i);
 	return process_latency;
+}
+
+SubsecondTime
+StackedDramPerfCache::getAccessLatency(
+					SubsecondTime pkt_time, 
+					UInt32 pkt_size, 
+					IntPtr address, 
+					DramCntlrInterface::access_t access_type)
+{
+
+	UInt32 offset = address & ((1 << OFF_BIT) -1 );
+	UInt64 addr = address >> OFF_BIT;
+	int v_i, b_i, p_i;
+	v_i = addr & ((1 << VAULT_BIT) - 1);
+	addr = addr >> VAULT_BIT;
+	b_i = addr & ((1 << BANK_BIT) - 1);
+	addr = addr >> BANK_BIT;
+	p_i = addr & ((1 << PART_BIT) - 1);
+	addr = addr >> PART_BIT;
+
+	addr = (addr << OFF_BIT) | offset;
+
+	VaultPerfModel* vault = m_vaults_array[v_i];
+	UInt32 bank_i = p_i * 2 + b_i;
+	UInt32 row_i = (addr >> floorLog2(m_row_size)) & ((1UL << 11) -1 );
+
+	SubsecondTime process_time = SubsecondTime::Zero();
+
+	//debug
+#ifdef LOG_OUTPUT
+	log_file  << ", bank_i: " << bank_i 
+			  << ", row_i: " << row_i << std::endl;
+#endif
+	
+	process_time += vault->processRequest(pkt_time, access_type, bank_i, row_i);
+
+	return process_time;
 }

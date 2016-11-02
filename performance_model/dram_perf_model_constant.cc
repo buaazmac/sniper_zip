@@ -61,7 +61,6 @@ DramPerfModelConstant::~DramPerfModelConstant()
    std::cout << "[EXTRA OUTPUT] Total Memory Request: " << tot_access << ", Swap Times: " << swap_times << std::endl;
    
    delete [] SRC;
-
    delete m_dram_perf_model;
 }
 

@@ -40,8 +40,46 @@ BankPerfModel::getRowState(UInt32 row_i)
 }
 
 SubsecondTime
+BankPerfModel::getTransitionLatency(Command p_cmd, Command a_cmd)
+{
+	SubsecondTime latency;
+	UInt32 vn = timing[(int)p_cmd].size();
+	UInt32 i = 0;
+	for (i = 0; i < vn; i++) {
+		if (timing[(int)p_cmd][i].cmd == a_cmd) {
+			uint64_t tmp = timing[p_cmd][i].val * 1000 / speed_table.freq;
+			latency = SubsecondTime::NS(tmp);
+			break;
+		}
+	}
+	if (i == vn) {
+		std::cout << "__ERROR__BANK_process_cmd: illegal transition" << std::endl;
+		std::cout << "_________cur_cmd: " << p_cmd << "__cmd: " << a_cmd << std::endl;
+		latency = SubsecondTime::Zero();
+	}
+	return latency;
+}
+
+SubsecondTime
 BankPerfModel::processCommand(Command cmd, UInt32 row_i, SubsecondTime cmd_time)
 {
+	bool row_hit = false;
+	SubsecondTime cmd_latency;
+
+	if (cmd == WR && cur_open_row == row_i) {
+		if (cur_cmd != ACT) {
+			stats.row_hits++;
+		}
+		row_hit = true;
+		cmd_latency = getTransitionLatency(ACT, WR);
+	}
+	if (cmd == RD && cur_open_row == row_i) {
+		if (cur_cmd != ACT) {
+			stats.row_hits++;
+		}
+		row_hit = true;
+		cmd_latency = getTransitionLatency(ACT, RD);
+	}
 
 	if (cur_time != SubsecondTime::Zero()) {
 		tot_time += (cmd_time - cur_time);
@@ -49,21 +87,8 @@ BankPerfModel::processCommand(Command cmd, UInt32 row_i, SubsecondTime cmd_time)
 	cur_time = cmd_time;
 
 	/* Here we calculate command transition latency */
-	SubsecondTime cmd_latency;
-	UInt32 vn = timing[(int)cur_cmd].size();
-	UInt32 i = 0;
-	for (i = 0; i < vn; i++) {
-		if (timing[(int)cur_cmd][i].cmd == cmd) {
-			uint64_t tmp = timing[cur_cmd][i].val * 1000 / speed_table.freq;
-			cmd_latency = SubsecondTime::NS(tmp);
-			break;
-		}
-	}
-	if (i == vn) {
-		std::cout << "__ERROR__BANK_process_cmd: illegal transition" << std::endl;
-		std::cout << "_________cur_cmd: " << cur_cmd << "__cmd: " << cmd << std::endl;
-		cmd_latency = SubsecondTime::Zero();
-	}
+	if (row_hit == false)
+		cmd_latency = getTransitionLatency(cur_cmd, cmd);
 
 	// std::cout << "Row index: " << row_i << std::endl;
 
@@ -71,26 +96,20 @@ BankPerfModel::processCommand(Command cmd, UInt32 row_i, SubsecondTime cmd_time)
 		case ACT:
 			stats.tACT += cmd_latency;
 			m_row_state[row_i] = Openned;
+			cur_open_row = row_i;
 			break;
 		case PRE:
 			stats.tPRE += cmd_latency;
 			m_row_state[row_i] = Closed;
+			cur_open_row = -1;
 			break;
 		case RD:
 			stats.tRD += cmd_latency;
 			stats.reads ++;
-			if (cur_open_row == row_i) {
-				stats.row_hits++;
-			}
-			cur_open_row = row_i;
 			break;
 		case WR:
 			stats.tWR += cmd_latency;
 			stats.writes ++;
-			if (cur_open_row == row_i) {
-				stats.row_hits++;
-			}
-			cur_open_row = row_i;
 			break;
 		default:
 			break;

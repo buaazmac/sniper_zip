@@ -5,6 +5,7 @@ VaultPerfModel::VaultPerfModel(UInt32 size, UInt32 bank_size, UInt32 row_size)
 	  m_bank_size(bank_size),
 	  m_row_size(row_size)
 {
+	auto_ref = false;
 	n_banks = m_size / bank_size;
 	m_banks_array = new BankPerfModel*[n_banks];
 	for (UInt32 i = 0; i < n_banks; i++) {
@@ -33,15 +34,22 @@ VaultPerfModel::processRequest(SubsecondTime cur_time, DramCntlrInterface::acces
 	    openned_row = bank->getOpennedRow();
 	} else if (op_row_u == row_i) {
 	} else {
+		if (auto_ref == false) {
+			process_latency += bank->processCommand(Command::PRE, openned_row, cur_time);
+		}
 		process_latency += bank->processCommand(Command::ACT, row_i, cur_time + process_latency);
 	}
 
 	if (access_type == DramCntlrInterface::WRITE) {
 		process_latency += bank->processCommand(Command::WR, row_i, cur_time + process_latency);
-		process_latency += bank->processCommand(Command::PRE, openned_row, cur_time);
+		if (auto_ref) {
+			process_latency += bank->processCommand(Command::PRE, openned_row, cur_time);
+		}
 	} else {
 		process_latency += bank->processCommand(Command::RD, row_i, cur_time + process_latency);
-		process_latency += bank->processCommand(Command::PRE, openned_row, cur_time);
+		if (auto_ref) {
+			process_latency += bank->processCommand(Command::PRE, openned_row, cur_time);
+		}
 	}
 	
 	return process_latency;

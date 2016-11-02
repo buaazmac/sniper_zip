@@ -15,6 +15,7 @@ class VaultPerfModel {
 		UInt32 m_bank_size;
 		UInt32 m_row_size;
 		UInt32 n_banks;
+		bool auto_ref;
 		BankPerfModel** m_banks_array;
 		
 		VaultPerfModel(UInt32 size, UInt32 bank_size, UInt32 row_size);

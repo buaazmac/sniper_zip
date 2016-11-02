@@ -1,6 +1,8 @@
 #ifndef __STACKED_DRAM_CNTLR_H__
 #define __STACKED_DRAM_CNTLR_H__
 
+#define LOG_OUTPUT
+
 #include "utils.h"
 
 #include "dram_vault.h"
@@ -38,6 +40,8 @@ class StackedDramPerfCache {
 
 		StackedDramPerfCache(UInt32 vaults_num, UInt32 vault_size, UInt32 bank_size, UInt32 row_size);
 		~StackedDramPerfCache();
+
+		SubsecondTime getAccessLatency(SubsecondTime pkt_time, UInt32 pkt_size, UInt32 set_i, DramCntlrInterface::access_t access_type);
 
 		SubsecondTime getAccessLatency(SubsecondTime pkt_time, UInt32 pkt_size, IntPtr address, DramCntlrInterface::access_t access_type);
 };

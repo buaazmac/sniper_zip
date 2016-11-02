@@ -67,6 +67,8 @@ class BankPerfModel {
 
 		RowState getRowState(UInt32 row_i);
 
+		SubsecondTime getTransitionLatency(Command p_cmd, Command a_cmd);
+
 		SubsecondTime processCommand(Command cmd, UInt32 row_i, SubsecondTime cmd_time);
 		bool isOpenned(UInt32 row_i);
 		int getOpennedRow();
