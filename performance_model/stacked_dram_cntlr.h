@@ -1,7 +1,7 @@
 #ifndef __STACKED_DRAM_CNTLR_H__
 #define __STACKED_DRAM_CNTLR_H__
 
-#define LOG_OUTPUT
+//#define LOG_OUTPUT
 
 #include "utils.h"
 
