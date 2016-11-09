@@ -1,9 +1,9 @@
 #ifndef __STACKED_DRAM_CNTLR_H__
 #define __STACKED_DRAM_CNTLR_H__
 
-//#define LOG_OUTPUT
-
 #include "utils.h"
+
+#include "stats.h"
 
 #include "dram_vault.h"
 #include "core.h"

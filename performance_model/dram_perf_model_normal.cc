@@ -269,6 +269,7 @@ StackDramCacheCntlr::StackDramCacheCntlr(
 	m_row_size = 8;
 
 	m_dram_perf_model = new StackedDramPerfCache(m_vault_num, m_vault_size, m_bank_size, m_row_size);
+	Sim()->getStatsManager()->init_stacked_dram_cache(m_dram_perf_model);
 }
 
 StackDramCacheCntlr::~StackDramCacheCntlr()

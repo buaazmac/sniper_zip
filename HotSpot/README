@@ -1,0 +1,6 @@
+../hotspot -c ../hotspot.config -f core_layer_cache.flr -p test.ptrace -o test.ttrace -model_type grid -grid_layer_file test_3D.lcf -grid_steady_file test.grid.steady
+../grid_thermal_map.pl core_layer.flr test.grid.steady > test.svg
+convert -font Helvetica svg:test.svg test.pdf
+
+../hotspot -c ../hotspot.config -f <filename> -p <powerfile> -steady_file <steadyfile> -model_type grid -detailed_3D on -grid_layer_file <lcffile>
+../hotspot -c ../hotspot.config -init_file <steadyfile> -f <filename> -p <powerfile> -o <ttracefile> -model_type grid -detailed_3D on -grid_layer_file <lcffile> -grid_steady_file test.grid.steady

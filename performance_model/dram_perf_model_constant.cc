@@ -30,6 +30,8 @@ DramPerfModelConstant::DramPerfModelConstant(core_id_t core_id,
 	}
 	
 	m_dram_perf_model = new StackedDramPerfMem(32, 128*1024, 16*1024, 8);
+
+	Sim()->getStatsManager()->init_stacked_dram_mem(m_dram_perf_model);
 	
 	tot_access = swap_times = 0;
 

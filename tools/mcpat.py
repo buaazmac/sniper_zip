@@ -40,72 +40,38 @@ def power2up(num):
       power2up_warnings[orig_num] = True
   return hob
 
-import PowerTable as pt
-import DramPowerConfig as dram_config
+def compute_dram_power(nread, nwrite, t, config):
 
-def compute_dram_power(act_t, pre_t, read_t, write_t, t, page_hit_rate, config):
-  maxVcc = float(dram_config.config['maxVcc'][0])
-  Vdd = float(dram_config.config['Vdd'][0])
-  Idd2P = float(dram_config.config['Idd2P'][0])
-  Idd2N = float(dram_config.config['Idd2N'][0])
-  Idd3P = float(dram_config.config['Idd3P'][0])
-  Idd3N = float(dram_config.config['Idd3N'][0])
-  Idd5 = float(dram_config.config['Idd5'][0])
-  Idd4W = float(dram_config.config['Idd4W'][0])
-  Idd0 = float(dram_config.config['Idd0'][0])
-  RFC_min = float(dram_config.config['RFC_min'][0])
-  REFI = float(dram_config.config['REFI'][0])
-  tRAS = float(dram_config.config['tRAS'][0])
-  tRC = float(dram_config.config['tRC'][0])
-  tCKavg = float(dram_config.config['tCKavg'][0])
-#tRRDsch = float(dram_config.config['tRRDsch'][0])
-  burstLen = int(dram_config.config['burstLen'][0])
-  # here we calculate different power parameter
-  tot_time = float(t * 1000000000000000)
-			#float(act_t + pre_t + read_t + write_t)
-  ck_freq = 800
-  bnk_pre = 1		#default value
-  cke_lo_pre = 1	#default value
-  cke_lo_act = 0	#default vaule
-  wr_sch = 0.01
-  rd_sch = 0.01
-  rd_per = 50
-  if read_t + write_t != 0:
-    rd_per = round((100 * read_t) / (read_t + write_t))
+  print '[dram power computation] %d, %d, %f' % (nread, nwrite, t)
 
-  if tot_time != 0:
-#bnk_pre = float(act_t + pre_t) / tot_time
-#cke_lo_pre = float(pre_t) / tot_time
-#cke_lo_act = float(act_t) / tot_time
-	bnk_pre = float(tot_time - write_t - read_t) / tot_time
-	cke_lo_pre = 0.3
-	cke_lo_act = 0.3 
-	wr_sch = float(write_t) / tot_time
-	rd_sch = float(read_t) / tot_time
-  if wr_sch + rd_sch == 0:
-    wr_sch = rd_sch = 0.0001
+  num_dram_controllers = int(config['perf_model/dram/num_controllers'])
+  if num_dram_controllers > 0:
+    sockets = num_dram_controllers
+  else:
+    sockets = math.ceil(float(config['general/total_cores']) / float(config['perf_model/dram/controllers_interleaving']))
+  chips_per_dimm = float(config.get('perf_model/dram/chips_per_dimm', DRAM_CHIPS_PER_DIMM))
+  dimms_per_socket = float(config.get('perf_model/dram/dimms_per_controller', DRAM_DIMMS_PER_SOCKET))
 
-  ck_col_avg = float(burstLen) / 2.0 / (wr_sch + rd_sch)
-  ck_row_avg = ck_col_avg / (1.0 - float(page_hit_rate))
-  tRRDsch = ck_row_avg * 1000 / ck_freq
+  if config.get('power/3d_dram', 'false').lower() in ('1', 'true'):
+    is3d = True
+  else:
+    is3d = False
 
-  psys_pre_pdn = Idd2P * Vdd * bnk_pre * cke_lo_pre
-  psys_pre_stby = Idd2N * Vdd * bnk_pre * (1 - cke_lo_pre) * ck_freq / 1000 * tCKavg
-  psys_act_pdn = Idd3P * Vdd * ((1 - cke_lo_pre) * cke_lo_act) * ck_freq / 1000 * tCKavg
-  psys_act_stby = Idd3N * Vdd * ((1 - cke_lo_pre) * (1 - cke_lo_act)) * ck_freq / 1000 * tCKavg
-  psys_ref = (Idd5 - Idd3N) * RFC_min / REFI / 1000 * Vdd
-  psys_act = (Idd0 - (Idd3N * tRAS / tRC + Idd2N * (tRC - tRAS) / tRC)) * Vdd * tRC / tRRDsch
+  ncycles = t * DRAM_CLOCK * 1e6
+  read_dc = nread / sockets / (ncycles or 1)
+  write_dc = nwrite / sockets / (ncycles or 1)
+  power_chip_dyn  = read_dc * DRAM_POWER_READ + write_dc * DRAM_POWER_WRITE
+  if is3d:
+    power_chip_stat = DRAM_POWER_STATIC + DRAM_POWER_STATIC_TSV_INTERFACE
+  else:
+    power_chip_stat = DRAM_POWER_STATIC + DRAM_POWER_STATIC_OFFCHIP_INTERFACE
+  power_socket_dyn  = power_chip_dyn * chips_per_dimm * dimms_per_socket
+  power_socket_stat = power_chip_stat * chips_per_dimm * dimms_per_socket
+  print 'dram clk:',  DRAM_CLOCK, ' ', 'read_power: ', DRAM_POWER_READ, 'write_power: ', DRAM_POWER_WRITE 
+  print ' chips_per_dimm: ', chips_per_dimm, 'dimms_per_socket: ', dimms_per_socket
+  print '[dram power result] %f, %f, %d' % (power_socket_dyn, power_socket_stat, sockets)
+  return (power_socket_dyn * sockets, power_socket_stat * sockets)
 
-  psys_wr = (Idd4W - Idd3N) * Vdd * burstLen / 8 * wr_sch * ck_freq / 1000 * tCKavg
-  psys_rd = (Idd4W - Idd3N) * Vdd * burstLen / 8 * rd_sch * ck_freq / 1000 * tCKavg
-  psys_read_io = psys_rd
-#float(pt.power_table[rd_per][4])
-
-  psys_tot_back = psys_pre_pdn + psys_pre_stby + psys_act_pdn + psys_act_stby + psys_ref + psys_act
-  psys_tot_front = float(psys_wr + psys_rd + psys_read_io)
-#float((1 - page_hit_rate) / 0.5) * float(psys_wr + psys_rd + psys_read_io)
-  print 'Power: {0}, {1}'.format(psys_tot_back, psys_tot_front)
-  return (psys_tot_back / 1000.0, psys_tot_front / 1000.0)
 
 def dram_power(results, config):
   return compute_dram_power(
@@ -159,22 +125,19 @@ all_items = [
   [ 'dram',     .01,    'dram' ],
 ]
 
-core_units = [('Execution Unit', 'exe'),
-			 ('Instruction Fetch Unit', 'ifetch'),
-			 ('Load Store Unit', 'lsu'),
-			 ('Memory Management Unit', 'mmu'),
-			 ('L2', 'l2'),
-			 ('Renaming Unit', 'ru')]
-
-chosen_data = 'Runtime Dynamic'
-
 all_names = buildstack.get_names(all_items)
 
 def get_all_names():
   return all_names
 
-def main(jobid, resultsdir, outputfile, powertype = 'dynamic', config = None, no_graph = False, partial = None, print_stack = True, return_data = False, dram_rst_file = ''):
+def main(jobid, resultsdir, outputfile, powertype = 'dynamic', config = None, no_graph = False, partial = None, print_stack = True, return_data = False):
   tempfile = outputfile + '.xml'
+
+  print 'tempfile: ', tempfile
+  print 'jobid: ', jobid
+  print 'resultsdir: ', resultsdir
+  print 'partial: ', partial
+
   results = sniper_lib.get_results(jobid, resultsdir, partial = partial)
   if config:
     results['config'] = sniper_config.parse_config(file(config).read(), results['config'])
@@ -247,78 +210,139 @@ def main(jobid, resultsdir, outputfile, powertype = 'dynamic', config = None, no
   if not power_dat:
     raise ValueError('No valid McPAT output found')
 
-  output2 = {}
   # Add DRAM power
-  total_time = results['results']['global.time'] * 1e-15,
-  print total_time
+  dram_dyn, dram_stat = dram_power(results['results'], results['config'])
+  power_dat['DRAM'] = {
+    'Peak Dynamic': dram_dyn,
+    'Runtime Dynamic': dram_dyn,
+    'Subthreshold Leakage': dram_stat,
+    'Subthreshold Leakage with power gating': dram_stat,
+    'Gate Leakage': 0,
+    'Area': 0,
+  }
+  # Write back
+  file(outputfile + '.py', 'w').write("power = " + pprint.pformat(power_dat))
 
-  dram_results_file = file(dram_rst_file + '.txt')
-
-  drams = dram_results_file.read().split('\n')[1:]
-  dram_num, dram_stat_power = 0, 0
-  for i in xrange(dram_config.VaultNum):
-    vault_power = float(0)
-    for j in xrange(dram_config.BankNum):
-      cur_bank = drams[dram_num].split()
-      print cur_bank
-      dram_num += 1
-      bank_n = cur_bank[0]
-      bank_act_t = int(cur_bank[1])
-      bank_pre_t = int(cur_bank[2])
-      bank_read_t = int(cur_bank[3])
-      bank_write_t = int(cur_bank[4])
-      bank_reads = int(cur_bank[5])
-      bank_writes = int(cur_bank[6])
-      bank_hits = int(cur_bank[7])
-      bank_row_hit_rate = 0.99
-      if bank_reads + bank_writes != 0:
-        bank_row_hit_rate = float(bank_hits) / float(bank_reads + bank_writes)
-      cur_bank_power = compute_dram_power(bank_act_t, bank_pre_t, bank_read_t, bank_write_t, \
-										  total_time[0], bank_row_hit_rate, \
-										  results['config'])
-      if bank_act_t != 0:
-        output2[bank_n] = cur_bank_power[0] + cur_bank_power[1]
-      else:
-        output2[bank_n] = cur_bank_power[0]
-      vault_power += output2[bank_n]
-    output2['dram_ctlr_%d' % i] = float(vault_power) / float(8)
 
   # Build stack
   ncores = int(results['config']['general/total_cores'])
   time0_begin = results['results']['global.time_begin']
   time0_end = results['results']['global.time_end']
   seconds = (time0_end - time0_begin)/1e15
+  results = power_stack(power_dat, powertype)
+  # Plot stack
+  plot_labels = []
+  plot_data = {}
+  if powertype == 'area':
+    if print_stack:
+      print '                         Area    Area %'
+    for core, (res, total, other, scale) in results.items():
+      plot_data[core] = {}
+      total_core = 0.; total_cache = 0.
+      for name, value in res:
+        if print_stack:
+          print '  %-12s    %6.2f mm^2   %6.2f%%' % (name, float(value), 100 * float(value) / total)
+        if name.startswith('core'):
+          total_core += float(value)
+        elif name in ('icache', 'dcache', 'l2', 'l3', 'nuca'):
+          total_cache += float(value)
+        plot_labels.append(name)
+        plot_data[core][name] = float(value)
+      if print_stack:
+        print
+        print '  %-12s    %6.2f mm^2   %6.2f%%' % ('core', float(total_core), 100 * float(total_core) / total)
+        print '  %-12s    %6.2f mm^2   %6.2f%%' % ('cache', float(total_cache), 100 * float(total_cache) / total)
+        print '  %-12s    %6.2f mm^2   %6.2f%%' % ('total', float(total), 100 * float(total) / total)
+  else:
+    if print_stack:
+      print '                     Power     Energy    Energy %'
+    for core, (res, total, other, scale) in results.items():
+      plot_data[core] = {}
+      total_core = 0.; total_cache = 0.
+      for name, value in res:
+        if print_stack:
+          energy, energy_scale = sniper_lib.scale_sci(float(value) * seconds)
+          print '  %-12s    %6.2f W   %6.2f %sJ    %6.2f%%' % (name, float(value), energy, energy_scale, 100 * float(value) / total)
+        if name.startswith('core'):
+          total_core += float(value)
+        elif name in ('icache', 'dcache', 'l2', 'l3', 'nuca'):
+          total_cache += float(value)
+        plot_labels.append(name)
+        plot_data[core][name] = float(value) * seconds
+      if print_stack:
+        print
+        energy, energy_scale = sniper_lib.scale_sci(float(total_core) * seconds)
+        print '  %-12s    %6.2f W   %6.2f %sJ    %6.2f%%' % ('core', float(total_core), energy, energy_scale, 100 * float(total_core) / total)
+        energy, energy_scale = sniper_lib.scale_sci(float(total_cache) * seconds)
+        print '  %-12s    %6.2f W   %6.2f %sJ    %6.2f%%' % ('cache', float(total_cache), energy, energy_scale, 100 * float(total_cache) / total)
+        energy, energy_scale = sniper_lib.scale_sci(float(total) * seconds)
+        print '  %-12s    %6.2f W   %6.2f %sJ    %6.2f%%' % ('total', float(total), energy, energy_scale, 100 * float(total) / total)
 
-  # Write back
-  print 'Cores number: %d' % ncores
-  for i in xrange(0, ncores):
-    for unitname in core_units:
-	  dataname = unitname[0] + '/' + chosen_data
-	  outputname = unitname[1] + '_' + str(i)
-	  output2[outputname] = power_dat['Core'][i][dataname]
-  output2['L3'] = power_dat['L3'][0][chosen_data]
+  if not no_graph:
+    # Use Gnuplot to make a stacked bargraphs of these cpi-stacks
+    if 'other' in plot_labels:
+      all_names.append('other')
+    all_names_with_colors = zip(all_names, range(1,len(all_names)+1))
+    plot_labels_with_color = [n for n in all_names_with_colors if n[0] in plot_labels]
+    gnuplot.make_stacked_bargraph(outputfile, plot_labels_with_color, plot_data, 'Energy (J)')
 
-  keylist = ['L3']
-  for i in xrange(4):
-    keylist.append('exe_%d' % i)
-    keylist.append('ifetch_%d' % i)
-    keylist.append('lsu_%d' % i)
-    keylist.append('mmu_%d' % i)
-    keylist.append('l2_%d' % i)
-    keylist.append('ru_%d' % i)
-  for i in xrange(dram_config.VaultNum):
-    keylist.append('dram_ctlr_%d' % i)
-  for j in xrange(dram_config.BankNum):
-    for i in xrange(dram_config.VaultNum):
-      keylist.append('dram_%d_%d' % (i, j))
-    
-  valuelist = []
-  for i, key in enumerate(keylist):
-    valuelist.append(str(output2[key]))
-  keystr = '\t'.join(keylist)
-  valuestr = '\t'.join(valuelist)
-  hotspot_input = dram_rst_file + '.input'
-  file(hotspot_input, "w").write(keystr + '\n' + valuestr + '\n' + valuestr)
+  if return_data:
+    return {'labels': plot_labels, 'power_data': plot_data, 'ncores': ncores, 'time_s': seconds}
+
+
+
+def power_stack(power_dat, powertype = 'total', nocollapse = False):
+  def getpower(powers, key = None):
+    def getcomponent(suffix):
+      if key: return powers.get(key+'/'+suffix, 0)
+      else: return powers.get(suffix, 0)
+    if powertype == 'dynamic':
+      return getcomponent('Runtime Dynamic')
+    elif powertype == 'static':
+      return getcomponent('Subthreshold Leakage with power gating') + getcomponent('Gate Leakage')
+    elif powertype == 'total':
+      return getcomponent('Runtime Dynamic') + getcomponent('Subthreshold Leakage with power gating') + getcomponent('Gate Leakage')
+    elif powertype == 'peak':
+      return getcomponent('Peak Dynamic') + getcomponent('Subthreshold Leakage with power gating') + getcomponent('Gate Leakage')
+    elif powertype == 'peakdynamic':
+      return getcomponent('Peak Dynamic')
+    elif powertype == 'area':
+      return getcomponent('Area') + getcomponent('Area Overhead')
+    else:
+      raise ValueError('Unknown powertype %s' % powertype)
+  data = {
+    'l2':               sum([ getpower(cache) for cache in power_dat.get('L2', []) ])  # shared L2
+                        + sum([ getpower(core, 'L2') for core in power_dat['Core'] ]), # private L2
+    'l3':               sum([ getpower(cache) for cache in power_dat.get('L3', []) ]),
+    'nuca':             sum([ getpower(cache) for cache in power_dat.get('NUCA', []) ]),
+    'noc':              getpower(power_dat['Processor'], 'Total NoCs'),
+    'dram':             getpower(power_dat['DRAM']),
+    'core':             sum([ getpower(core, 'Execution Unit/Instruction Scheduler')
+                              + getpower(core, 'Execution Unit/Register Files')
+                              + getpower(core, 'Execution Unit/Results Broadcast Bus')
+                              + getpower(core, 'Renaming Unit')
+                              for core in power_dat['Core']
+                            ]),
+    'core-ifetch':      sum([ getpower(core, 'Instruction Fetch Unit/Branch Predictor')
+                              + getpower(core, 'Instruction Fetch Unit/Branch Target Buffer')
+                              + getpower(core, 'Instruction Fetch Unit/Instruction Buffer')
+                              + getpower(core, 'Instruction Fetch Unit/Instruction Decoder')
+                              for core in power_dat['Core']
+                            ]),
+    'icache':           sum([ getpower(core, 'Instruction Fetch Unit/Instruction Cache') for core in power_dat['Core'] ]),
+    'dcache':           sum([ getpower(core, 'Load Store Unit/Data Cache') for core in power_dat['Core'] ]),
+    'core-alu-complex': sum([ getpower(core, 'Execution Unit/Complex ALUs') for core in power_dat['Core'] ]),
+    'core-alu-fp':      sum([ getpower(core, 'Execution Unit/Floating Point Units') for core in power_dat['Core'] ]),
+    'core-alu-int':     sum([ getpower(core, 'Execution Unit/Integer ALUs') for core in power_dat['Core'] ]),
+    'core-mem':         sum([ getpower(core, 'Load Store Unit/LoadQ')
+                              + getpower(core, 'Load Store Unit/StoreQ')
+                              + getpower(core, 'Memory Management Unit')
+                              for core in power_dat['Core']
+                            ]),
+  }
+  data['core-other'] = getpower(power_dat['Processor']) - (sum(data.values()) - data['dram'])
+  return buildstack.merge_items({ 0: data }, all_items, nocollapse = nocollapse)
+
 
 def edit_XML(statsobj, stats, cfg):
   #param = res['param']         #do it separately
@@ -1262,10 +1286,8 @@ if __name__ == '__main__':
   no_text = False
   partial = None
 
-  dram_rst_file = 'dram'
-
   try:
-    opts, args = getopt.getopt(sys.argv[1:], "hj:t:c:d:o:m:", [ 'no-graph', 'no-text', 'partial='])
+    opts, args = getopt.getopt(sys.argv[1:], "hj:t:c:d:o:", [ 'no-graph', 'no-text', 'partial=' ])
   except getopt.GetoptError, e:
     print e
     usage()
@@ -1285,15 +1307,6 @@ if __name__ == '__main__':
       config = a
     if o == '-o':
       outputfile = a
-    if o == '-m':
-      print a
-      dram_rst_file = ''
-      if a == 'cache':
-        dram_rst_file = 'StackedDramCache'
-      elif a == 'mem':
-        dram_rst_file = 'StackedDramMem'
-      else:
-        sys.stderr.write('Unrecognized dram type')
     if o == '--no-graph':
       no_graph = True
     if o == '--no-text':
@@ -1305,4 +1318,4 @@ if __name__ == '__main__':
       partial = a.split(':')
 
 
-  main(jobid = jobid, resultsdir = resultsdir, powertype = powertype, config = config, outputfile = outputfile, no_graph = no_graph, print_stack = not no_text, partial = partial, dram_rst_file = dram_rst_file)
+  main(jobid = jobid, resultsdir = resultsdir, powertype = powertype, config = config, outputfile = outputfile, no_graph = no_graph, print_stack = not no_text, partial = partial)
