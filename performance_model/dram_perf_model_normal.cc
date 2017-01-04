@@ -153,6 +153,14 @@ DramCacheSetUnison::getReplacementIndex()
 }
 
 void
+DramCacheSetUnison::invalidateContent()
+{
+	for (UInt32 i = 0; i < m_associativity; i++) {
+		m_cache_page_info_array[i]->invalidate();
+	}
+}
+
+void
 DramCacheSetUnison::updateReplacementIndex(UInt32 index)
 {
 }
@@ -226,9 +234,9 @@ DramCacheSetUnison::accessAttempt(Core::mem_op_t type, IntPtr tag, IntPtr offset
 }
 
 /*
-	StackDramCacheCntlr class
+	StackDramCacheCntlrUnison class
    */
-StackDramCacheCntlr::StackDramCacheCntlr(
+StackDramCacheCntlrUnison::StackDramCacheCntlrUnison(
 		UInt32 set_num, UInt32 associativity, UInt32 blocksize, UInt32 pagesize)
       : m_dram_bandwidth(8 * Sim()->getCfg()->getFloat("perf_model/dram/per_controller_bandwidth")), // Convert bytes to bits
 	  m_set_num(set_num),
@@ -236,6 +244,8 @@ StackDramCacheCntlr::StackDramCacheCntlr(
 	  m_blocksize(blocksize),
 	  m_pagesize(pagesize)
 {
+	log_file.open("unison_addr.txt");
+
 	std::cout << "Normal Cache Total set: " << set_num << std::endl;
 	m_set_info = new DramCacheSetInfoUnison(m_associativity);
 
@@ -268,13 +278,13 @@ StackDramCacheCntlr::StackDramCacheCntlr(
 	m_bank_size = 16 * 1024;
 	m_row_size = 8;
 
-	m_dram_perf_model = new StackedDramPerfCache(m_vault_num, m_vault_size, m_bank_size, m_row_size);
-	Sim()->getStatsManager()->init_stacked_dram_cache(m_dram_perf_model);
+	m_dram_perf_model = new StackedDramPerfUnison(m_vault_num, m_vault_size, m_bank_size, m_row_size);
+	Sim()->getStatsManager()->init_stacked_dram_unison(m_dram_perf_model);
 }
 
-StackDramCacheCntlr::~StackDramCacheCntlr()
+StackDramCacheCntlrUnison::~StackDramCacheCntlrUnison()
 {
-	std::cout << "---deleting dram cache controller from normal model" << std::endl;
+	std::cout << "---deleting dram cache controller from NORMAL model" << std::endl;
 
 	std::ofstream myfile;
 	myfile.open("DramCacheAccess1.txt");
@@ -310,6 +320,7 @@ StackDramCacheCntlr::~StackDramCacheCntlr()
 		<< ", miss: " << tot_miss << ", miss rate: " << miss_rate 
 		<< std::endl;
 
+	log_file.close();
 	delete m_set_info;
 	delete [] m_set;
 
@@ -317,7 +328,7 @@ StackDramCacheCntlr::~StackDramCacheCntlr()
 }
 
 SubsecondTime
-StackDramCacheCntlr::ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::access_t access_type, IntPtr address)
+StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::access_t access_type, IntPtr address)
 {
 	SubsecondTime model_delay = SubsecondTime::Zero();
 	SubsecondTime dram_delay = SubsecondTime::Zero();
@@ -332,6 +343,14 @@ StackDramCacheCntlr::ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::
 		std::cout << "ERROR: process request from llc" << std::endl;
 		return model_delay;
 	}
+
+#define ADDR_LOG
+#ifdef ADDR_LOG
+	log_file << "-address: " << address
+			 << ", set: " << set_n
+			 << ", page_tag: " << page_tag
+			 << ", page_offset: " << page_offset << std::endl;
+#endif
 
 	UInt8 block_num = page_offset / m_blocksize;
 	footprint = FHT[block_num];
@@ -387,9 +406,11 @@ StackDramCacheCntlr::ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::
 
 	model_delay += dram_delay;
 
+	UInt32 vault_bit = floorLog2(m_vault_num);
 	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
 	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
-	UInt32 vault_i = set_n >> bank_bit >> row_bit;
+	UInt32 vault_i = (set_n >> row_bit) & ((1UL << vault_bit) - 1);
+	UInt32 bank_i = (set_n >> row_bit >> vault_bit) & ((1 << bank_bit) - 1);
 
 
 	if (access_type == DramCntlrInterface::WRITE) {
@@ -404,11 +425,59 @@ StackDramCacheCntlr::ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::
 		}
 	}
 
+	/* Check vaults valid bit*/
+
+	m_dram_perf_model->checkTemperature(vault_i, bank_i);
+
+	bool v_valid_arr[32];
+	int b_valid_arr[32];
+	m_dram_perf_model->checkDramValid(v_valid_arr, b_valid_arr);
+
+	for (UInt32 i = 0; i < 32; i++) {
+		UInt32 row_num = (1 << row_bit);
+		UInt32 bank_num = (1 << bank_bit);
+		if (v_valid_arr[i]) {
+			int b_valid = b_valid_arr[i];
+			for (UInt32 bank_i = 0; bank_i < bank_num; bank_i++) {
+				if (((b_valid >> bank_i) & 1) == 0) {
+					#define INVALID_LOG
+					#ifdef INVALID_LOG
+					log_file << "INVALID BANK #" << i << "_" << bank_i << std::endl;
+					#endif
+					for (UInt32 row_i = 0; row_i < row_num; row_i++) {
+						UInt32 set_i = bank_i << vault_bit << row_bit;
+						set_i &= (i << row_bit);
+						set_i &= row_i;
+						m_set[set_i]->invalidateContent();
+					}
+				}
+			}
+		} else {
+			#define INVALID_LOG
+			#ifdef INVALID_LOG
+			log_file << "INVALID VAULT #" << i << std::endl;
+			#endif
+			/* we need to invalidate all sets in the vaults*/
+			for (UInt32 row_i = 0; row_i < row_num; row_i ++) {
+				for (UInt32 bank_i = 0; bank_i < bank_num; bank_i ++) {
+					UInt32 set_i = bank_i << vault_bit << row_bit;
+					set_i &= (i << row_bit);
+					set_i &= row_i;
+					m_set[set_i]->invalidateContent();
+				}
+			}
+		}
+	}
+
+	m_dram_perf_model->finishInvalidation();
+
+	/**/
+
 	return model_delay;
 }
 
 bool
-StackDramCacheCntlr::SplitAddress(IntPtr address, UInt32 *set_n, IntPtr *page_tag, IntPtr *page_offset)
+StackDramCacheCntlrUnison::SplitAddress(IntPtr address, UInt32 *set_n, IntPtr *page_tag, IntPtr *page_offset)
 {
 	*page_offset = address % m_pagesize;
 	UInt64 addr = address / m_pagesize;
@@ -448,7 +517,7 @@ DramPerfModelNormal::DramPerfModelNormal(core_id_t core_id,
    /*
 	  Initialize a dram cache controller
 	  */
-   m_dram_cache_cntlr = new StackDramCacheCntlr(StackedDramSize/StackedSetSize, StackedAssoc, StackedBlockSize, StackedPageSize);
+   m_dram_cache_cntlr = new StackDramCacheCntlrUnison(StackedDramSize/StackedSetSize, StackedAssoc, StackedBlockSize, StackedPageSize);
 }
 
 DramPerfModelNormal::~DramPerfModelNormal()

@@ -44,7 +44,8 @@ StatsManager::StatsManager()
    : m_keyid(0)
    , m_prefixnum(0)
    , m_db(NULL)
-   , m_stacked_dram_cache(NULL)
+   , m_stacked_dram_unison(NULL)
+   , m_stacked_dram_alloy(NULL)
    , m_stacked_dram_mem(NULL)
 {
    init();
@@ -54,7 +55,7 @@ StatsManager::StatsManager()
 
 StatsManager::~StatsManager()
 {
-   if (m_stacked_dram_cache != NULL || m_stacked_dram_mem != NULL) {
+   if (m_stacked_dram_unison != NULL || m_stacked_dram_alloy != NULL || m_stacked_dram_mem != NULL) {
 	   dram_stats_file.close();
    }
 
@@ -74,11 +75,19 @@ StatsManager::~StatsManager()
 }
 
 void
-StatsManager::init_stacked_dram_cache(StackedDramPerfCache *stacked_dram)
+StatsManager::init_stacked_dram_unison(StackedDramPerfUnison *stacked_dram)
 {
-	std::cout << "now initialize a stacked dram cache" << std::endl;
-	m_stacked_dram_cache = stacked_dram;
-	dram_stats_file.open("cache.stats");
+	std::cout << "now initialize a stacked dram unison cache" << std::endl;
+	m_stacked_dram_unison = stacked_dram;
+	dram_stats_file.open("unison_cache.stats");
+}
+
+void
+StatsManager::init_stacked_dram_alloy(StackedDramPerfAlloy *stacked_dram)
+{
+	std::cout << "now initialize a stacked dram alloy cache" << std::endl;
+	m_stacked_dram_alloy = stacked_dram;
+	dram_stats_file.open("alloy_cache.stats");
 }
 
 void
@@ -169,8 +178,11 @@ StatsManager::recordStats(String prefix)
    LOG_ASSERT_ERROR(res == SQLITE_DONE, "Error executing SQL statement: %s", sqlite3_errmsg(m_db));
 
 // output stacked dram stats
-   if (m_stacked_dram_cache != NULL) {
-	   std::cout << "Stacked dram cache has " << m_stacked_dram_cache->n_vaults << " vaults!" << std::endl;
+   /*
+	Unison Cache Stats
+	  */
+   if (m_stacked_dram_unison != NULL) {
+	   std::cout << "Stacked dram cache has " << m_stacked_dram_unison->n_vaults << " vaults!" << std::endl;
 
 		SubsecondTime tot_ACT, tot_PRE, tot_RD, tot_WR;
 		tot_ACT = tot_PRE = tot_RD = tot_WR = SubsecondTime::Zero();
@@ -180,8 +192,8 @@ StatsManager::recordStats(String prefix)
 		tot_access = tot_row_hits = 0;
 
 	    dram_stats_file << "@" <<  prefix << std::endl;
-		for (UInt32 i = 0; i < m_stacked_dram_cache->n_vaults; i++) {
-			VaultPerfModel* vault = m_stacked_dram_cache->m_vaults_array[i];
+		for (UInt32 i = 0; i < m_stacked_dram_unison->n_vaults; i++) {
+			VaultPerfModel* vault = m_stacked_dram_unison->m_vaults_array[i];
 			for (UInt32 j = 0; j < vault->n_banks; j++) {
 				BankPerfModel* bank = vault->m_banks_array[j];
 				dram_stats_file << "dram_" << i << "_" << j << " " 
@@ -211,6 +223,54 @@ StatsManager::recordStats(String prefix)
 		dram_stats_file << "@" << std::endl;
    }
 
+   /*
+	Alloy Cache Stats
+	  */
+   if (m_stacked_dram_alloy != NULL) {
+	   std::cout << "Stacked dram cache has " << m_stacked_dram_alloy->n_vaults << " vaults!" << std::endl;
+
+		SubsecondTime tot_ACT, tot_PRE, tot_RD, tot_WR;
+		tot_ACT = tot_PRE = tot_RD = tot_WR = SubsecondTime::Zero();
+
+		UInt32 tot_access, tot_row_hits;
+
+		tot_access = tot_row_hits = 0;
+
+	    dram_stats_file << "@" <<  prefix << std::endl;
+		for (UInt32 i = 0; i < m_stacked_dram_alloy->n_vaults; i++) {
+			VaultPerfModel* vault = m_stacked_dram_alloy->m_vaults_array[i];
+			for (UInt32 j = 0; j < vault->n_banks; j++) {
+				BankPerfModel* bank = vault->m_banks_array[j];
+				dram_stats_file << "dram_" << i << "_" << j << " " 
+						<< bank->stats.tACT << " " 
+						<< bank->stats.tPRE << " " 
+						<< bank->stats.tRD << " " 
+						<< bank->stats.tWR << " "
+						<< bank->stats.reads << " "
+						<< bank->stats.writes << " "
+						<< bank->stats.row_hits << std::endl;
+
+				tot_ACT += bank->stats.tACT;
+				tot_PRE += bank->stats.tPRE;
+				tot_RD += bank->stats.tRD;
+				tot_WR += bank->stats.tWR;
+
+				tot_access += bank->stats.reads + bank->stats.writes;
+				tot_row_hits += bank->stats.row_hits;
+			}
+		}
+		float row_hit_rate = 0;
+		if (tot_access != 0) 
+			row_hit_rate = (float)tot_row_hits / (float)tot_access;
+
+		dram_stats_file << "Total time: " << tot_ACT << ", " << tot_PRE << ", " << tot_RD << ", " << tot_WR << std::endl;
+		dram_stats_file << "Total access: "  << tot_access << ", Row Hit Rate: " << row_hit_rate << std::endl;
+		dram_stats_file << "@" << std::endl;
+   }
+
+   /*
+	PoM Stats
+	  */
    if (m_stacked_dram_mem != NULL) {
 	   std::cout << "Stacked dram mem has " << m_stacked_dram_mem->n_vaults << " vaults!" << std::endl;
 		SubsecondTime tot_ACT, tot_PRE, tot_RD, tot_WR;

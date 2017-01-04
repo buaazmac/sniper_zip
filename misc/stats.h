@@ -58,7 +58,8 @@ class StatsMetricCallback : public StatsMetricBase
       }
 };
 
-class StackedDramPerfCache;
+class StackedDramPerfUnison;
+class StackedDramPerfAlloy;
 class StackedDramPerfMem;
 class VaultPerfModel;
 class BankPerfModel;
@@ -79,7 +80,8 @@ class StatsManager
       StatsManager();
       ~StatsManager();
 
-	  void init_stacked_dram_cache(StackedDramPerfCache *stacked_dram);
+	  void init_stacked_dram_unison(StackedDramPerfUnison *stacked_dram);
+	  void init_stacked_dram_alloy(StackedDramPerfAlloy *stacked_dram);
 	  void init_stacked_dram_mem(StackedDramPerfMem *stacked_dram);
 
       void init();
@@ -100,7 +102,8 @@ class StatsManager
       sqlite3_stmt *m_stmt_insert_prefix;
       sqlite3_stmt *m_stmt_insert_value;
 
-	  StackedDramPerfCache *m_stacked_dram_cache;
+	  StackedDramPerfUnison *m_stacked_dram_unison;
+	  StackedDramPerfAlloy *m_stacked_dram_alloy;
 	  StackedDramPerfMem *m_stacked_dram_mem;
 	  std::ofstream dram_stats_file;
 

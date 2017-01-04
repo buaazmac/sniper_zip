@@ -97,6 +97,7 @@ class DramCacheSetUnison
 		~DramCacheSetUnison();
 
 		UInt32 getReplacementIndex();
+		void invalidateContent();
 		void updateReplacementIndex(UInt32);
 		void updateReplacementIndexTag(UInt32 index, IntPtr tag, IntPtr pc, IntPtr offset, UInt32 footprint);
 
@@ -120,7 +121,7 @@ class DramCacheSetUnison
 		void moveToMRU(UInt32 accessed_index);
 };
 
-class StackDramCacheCntlr
+class StackDramCacheCntlrUnison
 {
 	public:
         ComponentBandwidth m_dram_bandwidth;
@@ -146,16 +147,19 @@ class StackDramCacheCntlr
 		UInt32 m_bank_size;
 		UInt32 m_row_size;
 
-		//Performance model
-		StackedDramPerfCache* m_dram_perf_model;
+		//log file
+		std::ofstream log_file;
 
-		StackDramCacheCntlr(UInt32 set_num, UInt32 associativity, UInt32 blocksize, UInt32 pagesize);
-		~StackDramCacheCntlr();
+		//Performance model
+		StackedDramPerfUnison* m_dram_perf_model;
+
+		StackDramCacheCntlrUnison(UInt32 set_num, UInt32 associativity, UInt32 blocksize, UInt32 pagesize);
+		~StackDramCacheCntlrUnison();
 
 		SubsecondTime ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::access_t access_type, IntPtr address);
 		bool SplitAddress(IntPtr address, UInt32 *set_n, IntPtr *page_tag, IntPtr *page_offset);
 
-		friend class DramPerModelNormal;
+		friend class DramPerfModelNormal;
 
 };
 
@@ -169,7 +173,7 @@ class DramPerfModelNormal : public DramPerfModel
       SubsecondTime m_total_queueing_delay;
       SubsecondTime m_total_access_latency;
 
-	  StackDramCacheCntlr* m_dram_cache_cntlr;
+	  StackDramCacheCntlrUnison* m_dram_cache_cntlr;
 
    public:
       DramPerfModelNormal(core_id_t core_id,
