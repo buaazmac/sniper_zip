@@ -182,11 +182,12 @@ VaultRemappingStructure::isTooHot(UInt32 idx, UInt32 bank_i)
 {
 	bool bankTooHot = m_vremap_arr[idx]->isTooHot(bank_i);
 	if (bankTooHot) {
+		printf("---vault: %d blance bank: %d", idx, bank_i);
 		m_vremap_arr[idx]->balanceBanks(bank_i);
 	}
 	UInt32 cnt = m_vremap_arr[idx]->getCount();
 	//printf("vault_%d's count is %d, bankTooHot: %d\n", idx, cnt, bankTooHot);
-	if (cnt > 300) {
+	if (cnt > 10000000) {
 		return true;
 	}
 	return false;

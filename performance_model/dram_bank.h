@@ -16,6 +16,16 @@ enum Command {
 	MAX
 };
 
+// Statistics
+struct BankStatEntry {
+	SubsecondTime tACT;
+	SubsecondTime tPRE;
+	SubsecondTime tRD;
+	SubsecondTime tWR;
+	UInt32 reads;
+	UInt32 writes;
+	UInt32 row_hits;
+};
 class BankPerfModel {
 	public:
 		UInt32 m_bank_size;
@@ -28,16 +38,6 @@ class BankPerfModel {
 		enum RowState {
 			Openned, Closed, MAX
 		};
-		// Statistics
-		struct StatEntry {
-			SubsecondTime tACT;
-			SubsecondTime tPRE;
-			SubsecondTime tRD;
-			SubsecondTime tWR;
-			UInt32 reads;
-			UInt32 writes;
-			UInt32 row_hits;
-		} stats;
 		// Timing
 		struct TimingEntry {
 			Command cmd;
@@ -45,6 +45,8 @@ class BankPerfModel {
 			int val;
 		};
 		vector<TimingEntry> timing[13]; // we have 13 states
+		//Statistics
+		BankStatEntry stats;
 
 		// Speed
 		struct SpeedEntry {

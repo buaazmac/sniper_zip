@@ -72,13 +72,13 @@ BankRemappingStructure::~BankRemappingStructure()
 SubsecondTime
 BankRemappingStructure::swap(UInt32 src, UInt32 des)
 {
-	printf(" now begin swapping banks %d: %d\n", src, des);
+	//printf(" now begin swapping banks %d: %d\n", src, des);
 
 	bool s_orig = m_bremap_arr[src]->m_orig, d_orig = m_bremap_arr[des]->m_orig;
 	UInt32 src_des = m_bremap_arr[src]->getIdx();
 	UInt32 des_des = m_bremap_arr[des]->getIdx();
 
-	printf(" src_des: %d, des_des: %d\n", src_des, des_des);
+	//printf(" src_des: %d, des_des: %d\n", src_des, des_des);
 
 	m_bremap_arr[src]->remapTo(des);
 	if (!s_orig)
@@ -122,9 +122,11 @@ BankRemappingStructure::isTooHot(UInt32 idx)
 {
 	UInt32 cnt = m_bremap_arr[idx]->getCount();
 
-	//printf("bank_%d is too hot? %d\n", idx, cnt);
 
-	if (cnt > 100) {
+	if (cnt > 500000 && 0) {
+
+		//printf("bank_%d is too hot? %d\n", idx, cnt);
+
 		return true;
 	}
 	return false;

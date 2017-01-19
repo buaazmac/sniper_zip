@@ -202,7 +202,6 @@ StackedDramPerfUnison::getAccessLatency(
 	m_vremap_table->accessOnce(vault_i, bank_i, access_type);
 
 	//debug
-#define LOG_OUTPUT
 #ifdef LOG_OUTPUT
 	log_file << "Set num: " << set_i 
 			  << ", vault_i: " << vault_i

@@ -101,6 +101,9 @@ StatsManager::init_stacked_dram_mem(StackedDramPerfMem *stacked_dram)
 void
 StatsManager::init()
 {
+	/*Begin Init*/
+	printf("----------BEGIN_INIT_STATS_MANAGER------------\n");
+	/**/
    String filename = Sim()->getConfig()->formatOutputFileName("sim.stats.sqlite3");
    int ret;
 
@@ -127,10 +130,35 @@ StatsManager::init()
    {
       for (StatsMetricList::iterator it2 = it1->second.begin(); it2 != it1->second.end(); ++it2)
       {
+		  /*Output metric names*/
+		  printf("---------OUTPUT_METRIC----------------\n");
+		  printf("keyID: %ld, ObjectName: %s, MetricName: %s\n", it2->second.first, it1->first.c_str(), it2->first.c_str());
+		  printf("---------END_OUTPUT-------------------\n");
+		  
+
          recordMetricName(it2->second.first, it1->first, it2->first);
       }
    }
    sqlite3_exec(m_db, "END TRANSACTION", NULL, NULL, NULL);
+
+   /*Initial Hotspot*/
+   hotspot = new Hotspot();
+   /*Initial DRAM bank statistics*/
+   for (int i = 0; i < 32; i++) {
+	   for (int j =0; j < 8; j++) {
+		   bank_stats[i][j].tACT = SubsecondTime::Zero();
+		   bank_stats[i][j].tPRE = SubsecondTime::Zero();
+		   bank_stats[i][j].tRD = SubsecondTime::Zero();
+		   bank_stats[i][j].tWR = SubsecondTime::Zero();
+		   bank_stats[i][j].reads = 0;
+		   bank_stats[i][j].writes = 0;
+		   bank_stats[i][j].row_hits = 0;
+	   }
+   }
+
+	/*End Init*/
+	printf("----------END_INIT_STATS_MANAGER------------\n");
+	/**/
 }
 
 int
@@ -157,30 +185,78 @@ StatsManager::recordMetricName(UInt64 keyId, std::string objectName, std::string
    LOG_ASSERT_ERROR(res == SQLITE_DONE, "Error executing SQL statement");
 }
 
-void
-StatsManager::recordStats(String prefix)
+double 
+StatsManager::computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, SubsecondTime tRD, SubsecondTime tWR, SubsecondTime totT, double page_hit_rate)
 {
-   LOG_ASSERT_ERROR(m_db, "m_db not yet set up !?");
+	double act_t = double(tACT.getFS()), pre_t = double(tPRE.getFS()), read_t = double(tRD.getFS()), write_t = double(tWR.getFS()), tot_time = double(totT.getFS());
+    /*set some default value*/
+	int ck_freq = 800;
+    double bnk_pre = 1;
+    double cke_lo_pre = 1;
+    double cke_lo_act = 0;
+    double wr_sch = 0.01;
+    double rd_sch = 0.01;
+    int rd_per = 50;
+	if (read_t + write_t != 0)
+		rd_per = (100 * read_t) / (read_t + write_t);
 
-   // Allow lazily-maintained statistics to be updated
-   Sim()->getHooksManager()->callHooks(HookType::HOOK_PRE_STAT_WRITE, (UInt64)prefix.c_str());
+	/*set the real value*/
+	bnk_pre = double((tot_time - write_t - read_t) / tot_time);
+	cke_lo_pre = 0.3;
+	cke_lo_act = 0.3;
+	wr_sch = write_t / tot_time;
+	rd_sch = read_t / tot_time;
+	if (wr_sch + rd_sch == 0)
+		wr_sch = rd_sch = 0.0001;
 
-   int res;
-   int prefixid = ++m_prefixnum;
+	double ck_col_avg = double(dram_table.burstLen) / 2.0 / (wr_sch + rd_sch);
+	double ck_row_avg = ck_col_avg / (1.0 - double(page_hit_rate));
+	double tRRDsch = ck_row_avg * 1000 / ck_freq;
 
-   res = sqlite3_exec(m_db, "BEGIN TRANSACTION", NULL, NULL, NULL);
-   LOG_ASSERT_ERROR(res == SQLITE_OK, "Error executing SQL statement: %s", sqlite3_errmsg(m_db));
+	double psys_pre_pdn = dram_table.Idd2P * dram_table.Vdd * bnk_pre * cke_lo_pre;
+	double psys_pre_stby = dram_table.Idd2N * dram_table.Vdd * bnk_pre * (1 - cke_lo_pre) * ck_freq / 1000 * dram_table.tCKavg;
+	double psys_act_pdn = dram_table.Idd3P * dram_table.Vdd * ((1 - cke_lo_pre) * cke_lo_act) * ck_freq / 1000 * dram_table.tCKavg;
+	double psys_act_stby = dram_table.Idd3N * dram_table.Vdd * ((1 - cke_lo_pre) * (1 - cke_lo_act)) * ck_freq / 1000 * dram_table.tCKavg;
+	double psys_ref = (dram_table.Idd5 - dram_table.Idd3N) * dram_table.RFC_min / dram_table.REFI / 1000 * dram_table.Vdd;
+	double psys_act = (dram_table.Idd0 - (dram_table.Idd3N * dram_table.tRAS / dram_table.tRC + dram_table.Idd2N * (dram_table.tRC - dram_table.tRAS) / dram_table.tRC)) * dram_table.Vdd * dram_table.tRC / tRRDsch;
 
-   sqlite3_reset(m_stmt_insert_prefix);
-   sqlite3_bind_int(m_stmt_insert_prefix, 1, prefixid);
-   sqlite3_bind_text(m_stmt_insert_prefix, 2, prefix.c_str(), -1, SQLITE_TRANSIENT);
-   res = sqlite3_step(m_stmt_insert_prefix);
-   LOG_ASSERT_ERROR(res == SQLITE_DONE, "Error executing SQL statement: %s", sqlite3_errmsg(m_db));
+	double psys_wr = (dram_table.Idd4W - dram_table.Idd3N) * dram_table.Vdd * dram_table.burstLen / 8 * wr_sch * ck_freq / 1000 * dram_table.tCKavg;
+	double psys_rd = (dram_table.Idd4W - dram_table.Idd3N) * dram_table.Vdd * dram_table.burstLen / 8 * rd_sch * ck_freq / 1000 * dram_table.tCKavg;
+	double psys_read_io = psys_rd;
 
+	double psys_tot_back = psys_pre_pdn + psys_pre_stby + psys_act_pdn + psys_act_stby + psys_ref + psys_act;
+	double psys_tot_front = double(psys_wr + psys_rd + psys_read_io);
+	return (psys_tot_back / 1000.0 +  psys_tot_front / 1000.0);
+}
+
+double
+StatsManager::computeDramCntlrPower(UInt32 reads, UInt32 writes, SubsecondTime t)
+{
+	double tot_time = double(t.getSEC());
+	double ncycles = tot_time * dram_cntlr_table.DRAM_CLK * 1e6;
+	double sockets = dram_cntlr_table.num_dram_controllers;
+	double read_dc, write_dc;
+	if (ncycles != 0) {
+		read_dc = double(reads / sockets / ncycles);
+		write_dc = double(writes / sockets / ncycles);
+	}
+	else {
+		read_dc = double(reads / sockets);
+		write_dc = double(writes / sockets);
+	}
+	double power_chip_dyn = read_dc * dram_cntlr_table.DRAM_POWER_READ + write_dc * dram_cntlr_table.DRAM_POWER_WRITE;
+	double power_socket_dyn = power_chip_dyn * dram_cntlr_table.chips_per_dimm * dram_cntlr_table.dimms_per_socket;
+	return power_socket_dyn * sockets;
+}
+
+void
+StatsManager::dumpDramPowerTrace()
+{
 // output stacked dram stats
    /*
 	Unison Cache Stats
 	  */
+#ifdef OUTPUT_DRAM_STAT
    if (m_stacked_dram_unison != NULL) {
 	   std::cout << "Stacked dram cache has " << m_stacked_dram_unison->n_vaults << " vaults!" << std::endl;
 
@@ -191,7 +267,6 @@ StatsManager::recordStats(String prefix)
 
 		tot_access = tot_row_hits = 0;
 
-	    dram_stats_file << "@" <<  prefix << std::endl;
 		for (UInt32 i = 0; i < m_stacked_dram_unison->n_vaults; i++) {
 			VaultPerfModel* vault = m_stacked_dram_unison->m_vaults_array[i];
 			for (UInt32 j = 0; j < vault->n_banks; j++) {
@@ -311,6 +386,187 @@ StatsManager::recordStats(String prefix)
 		dram_stats_file << "Total access: "  << tot_access << ", Row Hit Rate: " << row_hit_rate << std::endl;
 		dram_stats_file << "@" << std::endl;
    }
+#endif
+}
+
+void
+StatsManager::updateBankStat(int i, int j, BankPerfModel* bank)
+{
+	bank_stats[i][j] = bank->stats;
+}
+
+void
+StatsManager::dumpHotspotInput()
+{
+	/* Here we dump input for hotspot
+	 * init_file(tmp.steady) from last time
+	 * -p powertrace.input
+	 */
+	/* Write each component name*/
+	std::ofstream pt_file;
+	pt_file.open("./HotSpot/powertrace.input");
+	pt_file << "L3";
+	for (int i = 0; i < 4; i++) {
+		pt_file << "\texe_" << i;
+		pt_file << "\tifetch_" << i;
+		pt_file << "\tlsu_" << i;
+		pt_file << "\tmmu_" << i;
+		pt_file << "\tl2_" << i;
+		pt_file << "\tru_" << i;
+	}
+	for (int i = 0; i < 32; i++) {
+		pt_file << "\tdram_ctlr_" << i;
+	}
+	for (int j = 0; j < 8; j++) {
+		for (int i = 0; i < 32; i++) {
+			pt_file << "\tdram_" << i << "_" << j;
+		}
+	}
+	pt_file << std::endl;
+
+/* Because Hotspot need a powertrace larger than 2, so we output twice*/
+for (int pt_it = 0; pt_it < 2; pt_it++) {
+	/* Write power of core component*/
+	double power_L3 = double(getMetricObject("L3", 0, "power-dynamic")->recordMetric()) / 1000000.0;
+	pt_file << power_L3;
+	for (int i = 0; i < 4; i++) {
+		double power_exe = double(getMetricObject("exe", i, "power-dynamic")->recordMetric()) / 1000000.0;
+		double power_ifetch = double(getMetricObject("ifetch", i, "power-dynamic")->recordMetric()) / 1000000.0;
+		double power_lsu = double(getMetricObject("lsu", i, "power-dynamic")->recordMetric()) / 1000000.0;
+		double power_mmu = double(getMetricObject("mmu", i, "power-dynamic")->recordMetric()) / 1000000.0;
+		double power_l2 = double(getMetricObject("L2", i, "power-dynamic")->recordMetric()) / 1000000.0;
+		double power_ru = double(getMetricObject("ru", i, "power-dynamic")->recordMetric()) / 1000000.0;
+		pt_file << "\t" << power_exe << "\t" << power_ifetch << "\t" << power_lsu 
+				<< "\t" << power_mmu << "\t" << power_l2 << "\t" << power_ru;
+	}
+
+	/* Write power of dram*/
+	BankStatEntry bank_stats_interval[32][8];
+	double bank_power[32][8];
+	double vault_power[32];
+	SubsecondTime tot_time = SubsecondTime::MS(1);
+	UInt32 n_banks = 8;
+	UInt32 n_vaults = m_stacked_dram_unison->n_vaults;
+
+   if (m_stacked_dram_unison != NULL) {
+
+		for (UInt32 i = 0; i < m_stacked_dram_unison->n_vaults; i++) {
+			VaultPerfModel* vault = m_stacked_dram_unison->m_vaults_array[i];
+			n_banks = vault->n_banks;
+
+			UInt32 tot_reads, tot_writes;
+			tot_reads = tot_writes = 0;
+
+			for (UInt32 j = 0; j < vault->n_banks; j++) {
+				BankPerfModel* bank = vault->m_banks_array[j];
+				bank_stats_interval[i][j] = bank->stats;
+				bank_stats_interval[i][j].tACT -= bank_stats[i][j].tACT;
+				bank_stats_interval[i][j].tPRE -= bank_stats[i][j].tPRE;
+				bank_stats_interval[i][j].tRD -= bank_stats[i][j].tRD;
+				bank_stats_interval[i][j].tWR -= bank_stats[i][j].tWR;
+				bank_stats_interval[i][j].reads -= bank_stats[i][j].reads;
+				bank_stats_interval[i][j].writes -= bank_stats[i][j].writes;
+				bank_stats_interval[i][j].row_hits -= bank_stats[i][j].row_hits;
+
+				/*Update current bank statistics*/
+				updateBankStat(i, j, bank);
+
+				BankStatEntry *tmp = &bank_stats_interval[i][j];
+
+				double page_hit_rate = 0.5;
+				if (tmp->reads + tmp->writes != 0) {
+					page_hit_rate = double(tmp->row_hits) / double(tmp->reads + tmp->writes);
+				}
+				bank_power[i][j] = computeDramPower(tmp->tACT, tmp->tPRE, tmp->tRD, tmp->tWR, tot_time, page_hit_rate);
+
+				tot_reads += tmp->reads;
+				tot_writes += tmp->writes;
+			}
+			vault_power[i] = computeDramCntlrPower(tot_reads, tot_writes, tot_time);
+			pt_file << "\t" << vault_power[i];
+		}
+		for (UInt32 j = 0; j < n_banks; j++) {
+			for (UInt32 i = 0; i < n_vaults; i++) {
+				pt_file << "\t" << bank_power[i][j];
+			}
+		}
+		pt_file << std::endl;
+   }
+}
+pt_file.close();
+}
+
+void
+StatsManager::callHotSpot()
+{
+	dumpHotspotInput();
+
+	char *argv[15];
+	/*First run to get steady states*/
+	argv[1] = "-c";
+	argv[2] = "./HotSpot/hotspot.config";
+  	argv[3] = "-steady_file";
+  	argv[4] = "./HotSpot/tmp.steady";
+  	argv[5] = "-f";
+  	argv[6] = "./HotSpot/core_layer.flr";
+  	argv[7] = "-p";
+  	argv[8] = "./HotSpot/powertrace.input";
+  	argv[9] = "-model_type";
+  	argv[10] = "grid";
+  	argv[11] = "-grid_layer_file";
+  	argv[12] = "./HotSpot/test_3D.lcf";
+
+  	hotspot->calculateTemperature(13, argv);
+
+	/*Second run to get final output*/
+	argv[1] = "-c";
+	argv[2] = "./HotSpot/hotspot.config";
+  	argv[3] = "-init_file";
+  	argv[4] = "./HotSpot/tmp.steady";
+  	argv[5] = "-f";
+  	argv[6] = "./HotSpot/core_layer.flr";
+  	argv[7] = "-p";
+  	argv[8] = "./HotSpot/powertrace.input";
+  	argv[9] = "-o";
+  	argv[10] = "./HotSpot/ttrace.output";
+  	argv[11] = "-model_type";
+  	argv[12] = "grid";
+  	argv[13] = "-grid_layer_file";
+  	argv[14] = "./HotSpot/test_3D.lcf";
+
+  	hotspot->calculateTemperature(15, argv);
+}
+
+
+void
+StatsManager::recordStats(String prefix)
+{
+	std::cout << "recordStats once" << std::endl;
+
+   LOG_ASSERT_ERROR(m_db, "m_db not yet set up !?");
+
+   // Allow lazily-maintained statistics to be updated
+   Sim()->getHooksManager()->callHooks(HookType::HOOK_PRE_STAT_WRITE, (UInt64)prefix.c_str());
+
+   int res;
+   int prefixid = ++m_prefixnum;
+
+   res = sqlite3_exec(m_db, "BEGIN TRANSACTION", NULL, NULL, NULL);
+   LOG_ASSERT_ERROR(res == SQLITE_OK, "Error executing SQL statement: %s", sqlite3_errmsg(m_db));
+
+   sqlite3_reset(m_stmt_insert_prefix);
+   sqlite3_bind_int(m_stmt_insert_prefix, 1, prefixid);
+   sqlite3_bind_text(m_stmt_insert_prefix, 2, prefix.c_str(), -1, SQLITE_TRANSIENT);
+   res = sqlite3_step(m_stmt_insert_prefix);
+   LOG_ASSERT_ERROR(res == SQLITE_DONE, "Error executing SQL statement: %s", sqlite3_errmsg(m_db));
+
+   /*prepare power data for HotSpot*/
+
+   /* Call HotSpot in Sniper*/
+   callHotSpot();
+
+   /* Dump power trace during runtime*/
+   dumpDramPowerTrace();
 
    for(StatsObjectList::iterator it1 = m_objects.begin(); it1 != m_objects.end(); ++it1)
    {
@@ -339,6 +595,9 @@ void
 StatsManager::registerMetric(StatsMetricBase *metric)
 {
    std::string _objectName(metric->objectName.c_str()), _metricName(metric->metricName.c_str());
+
+   /*print registerred metric*/
+   //printf("StatsManager::registerMetric: ObjName: %s, MtrName: %s\n", _objectName.c_str(), _metricName.c_str());
 
    LOG_ASSERT_ERROR(m_objects[_objectName][_metricName].second.count(metric->index) == 0,
       "Duplicate statistic %s.%s[%d]", _objectName.c_str(), _metricName.c_str(), metric->index);

@@ -43,6 +43,13 @@ DramCachePageInfo::invalidate()
 {
 	m_tag = ~0;
 	m_cstate = CacheState::INVALID;
+	vbits_0 = ~0;
+	vbits_1 = ~0;
+	dbits_0 = 0;
+	dbits_1 = 0;
+	m_used = 0;
+	offset = 0;
+	m_footprint = 0;
 }
 
 void
@@ -156,7 +163,9 @@ void
 DramCacheSetUnison::invalidateContent()
 {
 	for (UInt32 i = 0; i < m_associativity; i++) {
+
 		m_cache_page_info_array[i]->invalidate();
+
 	}
 }
 
@@ -220,7 +229,9 @@ DramCacheSetUnison::accessAttempt(Core::mem_op_t type, IntPtr tag, IntPtr offset
 	for (UInt32 i = 0; i < m_associativity; i++) {
 		DramCachePageInfo *page = m_cache_page_info_array[i];
 		if (page->getTag() == tag) {
+
 			if (page->accessBlock(type, block_num)) {
+				
 				res = 2;
 			} else {
 				res = 1;
@@ -344,13 +355,6 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 		return model_delay;
 	}
 
-#define ADDR_LOG
-#ifdef ADDR_LOG
-	log_file << "-address: " << address
-			 << ", set: " << set_n
-			 << ", page_tag: " << page_tag
-			 << ", page_offset: " << page_offset << std::endl;
-#endif
 
 	UInt8 block_num = page_offset / m_blocksize;
 	footprint = FHT[block_num];
@@ -412,6 +416,15 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 	UInt32 vault_i = (set_n >> row_bit) & ((1UL << vault_bit) - 1);
 	UInt32 bank_i = (set_n >> row_bit >> vault_bit) & ((1 << bank_bit) - 1);
 
+#ifdef ADDR_LOG
+	UInt32 hit_i32 = hit;
+	log_file << "-address: " << address
+			 << ", set: " << set_n
+			 << ", page_tag: " << page_tag
+			 << ", page_offset: " << page_offset 
+			 << ", hit: " << hit_i32
+			 << std::endl;
+#endif
 
 	if (access_type == DramCntlrInterface::WRITE) {
 		dram_stats[vault_i].writes ++;
@@ -432,6 +445,12 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 	bool v_valid_arr[32];
 	int b_valid_arr[32];
 	m_dram_perf_model->checkDramValid(v_valid_arr, b_valid_arr);
+	/*
+	for (UInt32 i = 0; i < 32; i++) {
+		v_valid_arr[i] = false;
+	}
+	*/
+	//v_valid_arr[vault_i] = false;
 
 	for (UInt32 i = 0; i < 32; i++) {
 		UInt32 row_num = (1 << row_bit);
@@ -446,13 +465,19 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 					#endif
 					for (UInt32 row_i = 0; row_i < row_num; row_i++) {
 						UInt32 set_i = bank_i << vault_bit << row_bit;
-						set_i &= (i << row_bit);
-						set_i &= row_i;
+						set_i |= (i << row_bit);
+						set_i |= row_i;
 						m_set[set_i]->invalidateContent();
 					}
 				}
 			}
 		} else {
+			
+			//std::cout << "Core0's Power: " << Sim()->getStatsManager()->getMetricObject("core", 0, "power-dynamic")->recordMetric() << std::endl;
+			//std::cout << "Core0's renaming unit Power: " << Sim()->getStatsManager()->getMetricObject("ru", 0, "power-dynamic")->recordMetric() << std::endl;
+
+			//std::cout << "Core0's Power: " << Sim()->getStatsManager()->getMetricObject("core", 0, "energy-dynamic")->recordMetric() << std::endl;
+
 			#define INVALID_LOG
 			#ifdef INVALID_LOG
 			log_file << "INVALID VAULT #" << i << std::endl;
@@ -461,8 +486,8 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 			for (UInt32 row_i = 0; row_i < row_num; row_i ++) {
 				for (UInt32 bank_i = 0; bank_i < bank_num; bank_i ++) {
 					UInt32 set_i = bank_i << vault_bit << row_bit;
-					set_i &= (i << row_bit);
-					set_i &= row_i;
+					set_i |= (i << row_bit);
+					set_i |= row_i;
 					m_set[set_i]->invalidateContent();
 				}
 			}

@@ -4,6 +4,10 @@
 #include "itostr.h"
 
 #include "../performance_model/stacked_dram_cntlr.h"
+#include "../performance_model/dram_vault.h"
+#include "../performance_model/dram_bank.h"
+
+#include "./HotSpot/hotspot.h"
 
 #include <strings.h>
 #include <sqlite3.h>
@@ -102,10 +106,50 @@ class StatsManager
       sqlite3_stmt *m_stmt_insert_prefix;
       sqlite3_stmt *m_stmt_insert_value;
 
+	  /*Stacked Dram Controller*/
 	  StackedDramPerfUnison *m_stacked_dram_unison;
 	  StackedDramPerfAlloy *m_stacked_dram_alloy;
 	  StackedDramPerfMem *m_stacked_dram_mem;
 	  std::ofstream dram_stats_file;
+	  /*Record the previous statistics*/
+	  struct BankStatEntry bank_stats[32][8];
+
+	  void dumpDramPowerTrace();
+	  void updateBankStat(int i, int j, BankPerfModel* bank);
+	  /*Hotspot*/
+	  void dumpHotspotInput();
+	  void callHotSpot();
+	  Hotspot *hotspot;
+	  /*Calculate DRAM power*/
+	  struct DramTable {
+		  double maxVcc; //1.26V
+		  double Vdd;	//1.2V
+		  double Idd2P;  //34mA
+		  double Idd2N;  //50mA
+		  double Idd3P;  //40mA
+		  double Idd3N;  //65mA
+		  double Idd5;   //175mA
+		  double Idd4W;  //195mA
+		  double Idd0;   //65mA
+		  double RFC_min;//260ns
+		  double REFI;   //7800ns
+		  double tRAS;   //32ns
+		  double tRC;    //45.5ns
+		  double tCKavg; //0.75ns
+		  int burstLen; //8
+	  } dram_table = {1.26, 1.2, 34, 50, 40, 65, 175, 195, 65, 260, 7800, 32, 45.5, 0.75, 8};
+	  struct DramCntlrTable {
+		  double DRAM_CLK;
+		  double DRAM_POWER_READ;
+		  double DRAM_POWER_WRITE;
+		  double num_dram_controllers;
+		  double chips_per_dimm;
+		  double dimms_per_socket;
+	  } dram_cntlr_table = {800.0, 0.678, 0.825, 1.0, 8.0, 4.0};
+
+	  double computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, SubsecondTime tRD, SubsecondTime tWR, SubsecondTime totT, double page_hit_rate);
+	  double computeDramCntlrPower(UInt32 reads, UInt32 writes, SubsecondTime t);
+
 
       // Use std::string here because String (__versa_string) does not provide a hash function for STL containers with gcc < 4.6
       typedef std::unordered_map<UInt64, StatsMetricBase *> StatsIndexList;
