@@ -1,5 +1,5 @@
 """
-Make energy available as a statistic by running a partial McPAT on every statistics snapshot save
+Make temperature available as a statistic by running a partial McPAT on every statistics snapshot save
 
 Works by registering a PRE_STAT_WRITE hook, which, before a stats snapshot write is triggered:
 - Writes the current statistics to the database using the energystats-temp prefix
@@ -40,7 +40,7 @@ core_units = [('Execution Unit', 'exe'),
 
 chosen_data = 'Runtime Dynamic'
 
-class EnergyStats:
+class ThermalStats:
   def setup(self, args):
     args = dict(enumerate((args or '').split(':')))
     interval_ns = long(args.get(0, None) or 1000000) # Default power update every 1 ms
@@ -55,19 +55,25 @@ class EnergyStats:
     self.power = {}
     self.energy = {}
     self.create_file = False
-    for metric in ('energy-static', 'energy-dynamic'):
+    for metric in ('power-static', 'power-dynamic'):
       for core in range(sim.config.ncores):
         print "-----register: ", metric, " ", core
         sim.stats.register('core', core, metric, self.get_stat)
         sim.stats.register('L1-I', core, metric, self.get_stat)
         sim.stats.register('L1-D', core, metric, self.get_stat)
         sim.stats.register('L2', core, metric, self.get_stat)
+        sim.stats.register('exe', core, metric, self.get_stat)
+        sim.stats.register('ifetch', core, metric, self.get_stat)
+        sim.stats.register('lsu', core, metric, self.get_stat)
+        sim.stats.register('mmu', core, metric, self.get_stat)
+        sim.stats.register('ru', core, metric, self.get_stat)
       #sim.stats.register_per_thread('core-'+metric, 'core', metric)
       #sim.stats.register_per_thread('L1-I-'+metric, 'L1-I', metric)
       #sim.stats.register_per_thread('L1-D-'+metric, 'L1-D', metric)
       #sim.stats.register_per_thread('L2-'+metric, 'L2', metric)
       sim.stats.register('processor', 0, metric, self.get_stat)
       sim.stats.register('dram', 0, metric, self.get_stat)
+      sim.stats.register('L3', 0, metric, self.get_stat)
 
   def periodic(self, time, time_delta):
     self.update()
@@ -107,41 +113,12 @@ class EnergyStats:
       self.time_last_power = sim.stats.time()
     # Increment energy
     self.update_energy()
-    # Here we output power result we need
-    if power_rst:
-      # Initialize stats file
-      if not self.create_file:
-        self.create_file = True
-        with open('core.stats', 'w') as f:
-          f.write('!\n')
-      output = {}
-      keylist = ['L3']
-      valuelist = []
-      with open('core.stats', 'a') as f:
-        f.write('@' + current + '\n')
-        for i in xrange(0, sim.config.ncores):
-          for unitname in core_units:
-            dataname = unitname[0] + '/' + chosen_data
-            outputname = unitname[1] + '_' + str(i)
-            output[outputname] = power_rst['Core'][i][dataname]
-        output['L3'] = power_rst['L3'][0][chosen_data]
-        for i in xrange(0, sim.config.ncores):
-          keylist.append('exe_%d' % i)
-          keylist.append('ifetch_%d' % i)
-          keylist.append('lsu_%d' % i)
-          keylist.append('mmu_%d' % i)
-          keylist.append('l2_%d' % i)
-          keylist.append('ru_%d' % i)
-        for i, key in enumerate(keylist):
-          valuelist.append(str(output[key]))
-        keystr = '\t'.join(keylist)
-        valuestr = '\t'.join(valuelist)
-        f.write(keystr + '\n' + valuestr + '\n@\n')
 
   def get_stat(self, objectName, index, metricName):
     if not self.in_stats_write:
       self.update()
     res = self.energy.get((objectName, index, metricName), 0L)
+#print 'get_stat', objectName, index, metricName, res
     return self.energy.get((objectName, index, metricName), 0L)
 
   def update_power(self, power):
@@ -152,15 +129,23 @@ class EnergyStats:
       self.power[('L1-D', core)] = get_power(power['Core'][core], 'Load Store Unit/Data Cache/')
       self.power[('L2',   core)] = get_power(power['Core'][core], 'L2/')
       self.power[('core', core)] = get_power(power['Core'][core]) - (self.power[('L1-I', core)] + self.power[('L1-D', core)] + self.power[('L2', core)])
+      self.power[('exe', core)] = get_power(power['Core'][core], 'Execution Unit/')
+      self.power[('ifetch', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/')
+      self.power[('lsu', core)] = get_power(power['Core'][core], 'Load Store Unit/')
+      self.power[('mmu', core)] = get_power(power['Core'][core], 'Memory Management Unit/')
+      self.power[('ru', core)] = get_power(power['Core'][core], 'Renaming Unit/')
     self.power[('processor', 0)] = get_power(power['Processor'])
     self.power[('dram', 0)] = get_power(power['DRAM'])
+    self.power[('L3', 0)] = get_power(power['L3'])
 
   def update_energy(self):
     if self.power and sim.stats.time() > self.time_last_energy:
       time_delta = sim.stats.time() - self.time_last_energy
       for (component, core), power in self.power.items():
-        self.energy[(component, core, 'energy-static')] = self.energy.get((component, core, 'energy-static'), 0) + long(time_delta * power.s)
-        self.energy[(component, core, 'energy-dynamic')] = self.energy.get((component, core, 'energy-dynamic'), 0) + long(time_delta * power.d)
+        self.energy[(component, core, 'power-static')] = long(power.s * 1000000)
+        self.energy[(component, core, 'power-dynamic')] = long(power.d * 1000000)
+#self.energy[(component, core, 'energy-static')] = self.energy.get((component, core, 'energy-static'), 0) + long(time_delta * power.s)
+#self.energy[(component, core, 'energy-dynamic')] = self.energy.get((component, core, 'energy-dynamic'), 0) + long(time_delta * power.d)
       self.time_last_energy = sim.stats.time()
 
   def get_vdd_from_freq(self, f):
@@ -198,10 +183,10 @@ vdd[] = %s
     ))
 
     result = {}
-    print 'run_power in energystats' + outputbase
+    print 'run_power in thermalstats' + outputbase
     execfile(outputbase + '.py', {}, result)
     return result['power']
 
 # All scripts execute in global scope, so other scripts will be able to call energystats.update()
-energystats = EnergyStats()
-sim.util.register(energystats)
+thermalstats = ThermalStats()
+sim.util.register(thermalstats)
