@@ -18,13 +18,8 @@ enum Command {
 
 // Statistics
 struct BankStatEntry {
-	SubsecondTime tACT;
-	SubsecondTime tPRE;
-	SubsecondTime tRD;
-	SubsecondTime tWR;
-	UInt32 reads;
-	UInt32 writes;
-	UInt32 row_hits;
+	SubsecondTime tACT, tPRE, tRD, tWR;
+	UInt32 reads, writes, row_hits;
 };
 class BankPerfModel {
 	public:

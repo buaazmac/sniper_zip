@@ -6,9 +6,13 @@ VaultRemappingEntry::VaultRemappingEntry(UInt32 idx)
 
 	m_valid = true;
 	m_orig = true;
-	n_count = 0;
+	m_changed = false;
 	m_idx = idx;
 	m_ridx = idx; // point to itself
+
+	clearStats();
+
+	n_access = 0;
 
 	m_bremap_table = new BankRemappingStructure(m_bank_num);
 }
@@ -19,23 +23,38 @@ VaultRemappingEntry::~VaultRemappingEntry()
 }
 
 void
+VaultRemappingEntry::clearStats()
+{
+	stats.tACT = stats.tPRE = stats.tRD = stats.tWR = SubsecondTime::Zero();
+	stats.reads = stats.writes = stats.row_hits = 0;
+}
+
+void
+VaultRemappingEntry::clearAccess()
+{
+	n_access = 0;
+	m_bremap_table->clearAllAccess();
+}
+
+void
 VaultRemappingEntry::remapTo(UInt32 idx)
 {
 	m_ridx = idx;
 	//reset the access count
-	n_count = 0;
+	clearStats();
 	if (idx != m_idx)
 		m_orig = false;
 	else
 		m_orig = true;
 	//m_valid = false;
 	setValidBit(false);
+	//setChangedBit(true);
 }
 
 UInt32
-VaultRemappingEntry::getCount()
+VaultRemappingEntry::getAccess()
 {
-	return n_count;
+	return n_access;
 }
 
 UInt32
@@ -45,12 +64,17 @@ VaultRemappingEntry::getIdx()
 }
 
 SubsecondTime
-VaultRemappingEntry::accessOnce(UInt32 bank_idx)
+VaultRemappingEntry::accessOnce(UInt32 bank_idx, DramCntlrInterface::access_t access_type, SubsecondTime pkt_time)
 {
 	SubsecondTime latency = SubsecondTime::Zero();
-	n_count++;
+	n_access ++;
+	if (access_type == DramCntlrInterface::WRITE) {
+		stats.writes++;
+	} else {
+		stats.reads++;
+	}
 
-	m_bremap_table->accessOnce(bank_idx);
+	m_bremap_table->accessOnce(bank_idx, access_type, pkt_time);
 
 	return latency;
 }
@@ -69,15 +93,15 @@ VaultRemappingEntry::setValidBit(bool valid)
 }
 
 bool
-VaultRemappingEntry::isTooHot(UInt32 bank_idx)
+VaultRemappingEntry::isTooHot(UInt32 phy_vault_i, UInt32 bank_idx)
 {
-	return m_bremap_table->isTooHot(bank_idx);
+	return m_bremap_table->isTooHot(phy_vault_i, bank_idx);
 }
 
 void
-VaultRemappingEntry::balanceBanks(UInt32 bank_idx)
+VaultRemappingEntry::balanceBanks(UInt32 phy_vault_i, UInt32 bank_idx)
 {
-	m_bremap_table->balanceBanks(bank_idx);
+	m_bremap_table->balanceBanks(phy_vault_i, bank_idx);
 }
 
 int
@@ -113,6 +137,10 @@ SubsecondTime
 VaultRemappingStructure::swap(UInt32 src, UInt32 des)
 {
 	//printf(" now begin swapping %d: %d\n", src, des);
+	m_vremap_arr[src]->setChangedBit(true);
+	m_vremap_arr[src]->clearAccess();
+	m_vremap_arr[des]->setChangedBit(true);
+	m_vremap_arr[des]->clearAccess();
 
 	bool s_orig = m_vremap_arr[src]->m_orig, d_orig = m_vremap_arr[des]->m_orig;
 	UInt32 src_des = m_vremap_arr[src]->getIdx();
@@ -180,39 +208,93 @@ VaultRemappingStructure::getBankValid(UInt32 vault_idx)
 bool
 VaultRemappingStructure::isTooHot(UInt32 idx, UInt32 bank_i)
 {
-	bool bankTooHot = m_vremap_arr[idx]->isTooHot(bank_i);
+	bool valid;
+	bool tooHot = false;
+	UInt32 phy_vault_i = getVaultIdx(idx, &valid);
+	bool bankTooHot = m_vremap_arr[idx]->isTooHot(phy_vault_i, bank_i);
+	/* Get temperature data*/
+	double cntlr_temp = Sim()->getStatsManager()->getDramCntlrTemp(phy_vault_i);
+
 	if (bankTooHot) {
 		printf("---vault: %d blance bank: %d", idx, bank_i);
-		m_vremap_arr[idx]->balanceBanks(bank_i);
+		m_vremap_arr[idx]->balanceBanks(phy_vault_i, bank_i);
 	}
-	UInt32 cnt = m_vremap_arr[idx]->getCount();
-	//printf("vault_%d's count is %d, bankTooHot: %d\n", idx, cnt, bankTooHot);
-	if (cnt > 10000000) {
-		return true;
+	UInt32 cnt = m_vremap_arr[idx]->getAccess();
+	bool v_changed = m_vremap_arr[idx]->getChangedBit();
+	/* Calculate Access Rate*/
+	SubsecondTime interval = current_time - last_time;
+	double interval_ms = double(interval.getFS()) * 1.0e-12;
+
+	double access_rate = double(cnt) / interval_ms;
+	printf("[Vault access rate] Interval: %.2f ms, Access: %d, AccessRate: %.2f\n", 
+			interval_ms, cnt, access_rate);
+
+	double update_time = 0.5;
+
+	if (access_rate > 100 && interval_ms > update_time) {
+		printf("---vault_%d is ACCESSED TOO FREQUENTLY! %.5f in %.5f ms\n", phy_vault_i, access_rate, interval_ms);
+		// time to remap
+		if (1) {
+			printf("---vault_%d is about to be swapped!\n", phy_vault_i);
+			tooHot = true;
+		} else {
+			//printf("---vault_%d was just swapped!\n", phy_vault_i);
+		}
 	}
-	return false;
+	if (interval_ms > update_time + 0.1) {
+		clearAllAccess();
+	}
+	return tooHot;
 }
 
 void
 VaultRemappingStructure::balanceVaults(UInt32 idx)
 {
-	UInt32 target = idx;
-	UInt32 min_c = 99999;
+	SubsecondTime interval = current_time - last_time;
+	// set default target
+	UInt32 target = 100;
+	VaultRemappingEntry* orig_vault = m_vremap_arr[idx];
+	UInt32 orig_remap = orig_vault->m_ridx;
+	double min_temp = 999, orig_temp = Sim()->getStatsManager()->getDramCntlrTemp(orig_remap);
+	int min_cnt = 9999999;
 
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		VaultRemappingEntry* vault = m_vremap_arr[i];
-		UInt32 cnt = vault->getCount();
+		
+		/* we don't want to swap vault already swapped */
+		if (vault->getChangedBit()) continue;
+
+		UInt32 cnt = vault->getAccess();
 		UInt32 remap_i = vault->m_ridx;
-		if (remap_i != idx && cnt < min_c) {
-			min_c = cnt;
+		double cntlr_temp = Sim()->getStatsManager()->getDramCntlrTemp(remap_i);
+		/* Trade-off */
+		/*
+		if (vault->m_changed) {
+			cnt += 10000;
+		}*/
+		//if (remap_i != idx && cnt < min_c) {
+		/*
+		if (min_temp > cntlr_temp) {
+			min_temp = cntlr_temp;
+			target = remap_i;
+		}
+		*/
+		if (cnt < min_cnt && cntlr_temp < orig_temp + 5) {
+			min_cnt = cnt;
+			min_temp = cntlr_temp;
 			target = remap_i;
 		}
 	}
 
-	std::cout << " balance vault " << idx
-			  << ", balance target: " << target << std::endl;
-
-	swap(idx, target);
+	printf(" balance vault %d(%d)? temp: %.5f\n", idx, orig_remap, orig_temp);
+	if (target != orig_remap && target != 100) {
+		printf("-----balance vault %d, balance target: %d, temp: %.5f\n", idx, target, min_temp);
+		swap(idx, target);
+	} else if (target == 100) {
+		printf(" It seems that all vaults have been remapped!");
+		enableAllVault();
+	}
+	//clearAccess();
 }
 
 void 
@@ -227,10 +309,43 @@ VaultRemappingStructure::setInvalid(UInt32 idx)
 	m_vremap_arr[idx]->setValidBit(false);
 }
 
-SubsecondTime
-VaultRemappingStructure::accessOnce(UInt32 vault_idx, UInt32 bank_idx, DramCntlrInterface::access_t access_type)
+void
+VaultRemappingStructure::clearAllAccess()
 {
-	SubsecondTime access_time  = m_vremap_arr[vault_idx]->accessOnce(bank_idx);
+	for (UInt32 i = 0; i < n_vaults; i++) {
+		m_vremap_arr[i]->clearAccess();
+		//m_vremap_arr[i]->setChangedBit(false);
+	}
+	last_time = current_time;
+}
+
+void
+VaultRemappingStructure::enableAllVault()
+{
+	for (UInt32 i = 0; i < n_vaults; i++) {
+		m_vremap_arr[i]->setChangedBit(false);
+	}
+}
+
+int
+VaultRemappingStructure::getUsableVaultNum()
+{
+	int num = 0;
+	for (UInt32 i = 0; i < n_vaults; i++) {
+		if (!m_vremap_arr[i]->getChangedBit()) {
+			num ++;
+		}
+	}
+	return num;
+}
+
+SubsecondTime
+VaultRemappingStructure::accessOnce(UInt32 vault_idx, UInt32 bank_idx, DramCntlrInterface::access_t access_type, SubsecondTime pkt_time)
+{
+	/* Update current time*/
+	if (pkt_time > current_time)
+		current_time = pkt_time;
+	SubsecondTime access_time  = m_vremap_arr[vault_idx]->accessOnce(bank_idx, access_type, pkt_time);
 
 	return access_time;
 }

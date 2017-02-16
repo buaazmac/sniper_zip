@@ -8,6 +8,7 @@
 #include "../performance_model/dram_bank.h"
 
 #include "./HotSpot/hotspot.h"
+#include "./HotSpot/util.h"
 
 #include <strings.h>
 #include <sqlite3.h>
@@ -90,6 +91,12 @@ class StatsManager
 
       void init();
       void recordStats(String prefix);
+
+	  /* get temperature of DRAM components*/
+	  void updateCurrentTime(SubsecondTime t);
+	  double getDramCntlrTemp(UInt32 vault_num);
+	  double getDramBankTemp(UInt32 vault_num, UInt32 bank_num);
+
       void registerMetric(StatsMetricBase *metric);
       StatsMetricBase *getMetricObject(String objectName, UInt32 index, String metricName);
       void logTopology(String component, core_id_t core_id, core_id_t master_id);
@@ -112,8 +119,25 @@ class StatsManager
 	  StackedDramPerfMem *m_stacked_dram_mem;
 	  std::ofstream dram_stats_file;
 	  /*Record the previous statistics*/
+	  SubsecondTime m_current_time;
 	  struct BankStatEntry bank_stats[32][8];
+	  BankStatEntry bank_stats_interval[32][8];
+	  UInt32 vault_access[32];
+	  /* Write power of dram*/
+	  double bank_power[32][8];
+	  double vault_power[32];
+	  double power_L3;
+	  double power_exe[4], power_ifetch[4], power_lsu[4], power_mmu[4], power_l2[4], power_ru[4];
+	  
+	  /*Temperature data*/
+	  int unit_num;
+	  char **unit_names;
+	  double *unit_temp;
 
+	  const char *ttrace_file = "./test_ttrace.txt";
+	  int ttrace_num;
+	  std::ofstream power_trace_log;
+	  std::ofstream temp_trace_log;
 	  void dumpDramPowerTrace();
 	  void updateBankStat(int i, int j, BankPerfModel* bank);
 	  /*Hotspot*/

@@ -45,6 +45,7 @@ class StackedDramPerfUnison {
 		UInt32 m_vault_size;
 		UInt32 m_bank_size;
 		UInt32 m_row_size;
+		int tot_reads, tot_writes, tot_misses;
 
 		/* structure for vault remapping*/
 		VaultRemappingStructure *m_vremap_table;
@@ -60,6 +61,7 @@ class StackedDramPerfUnison {
 		void checkDramValid(bool *valid_arr, int *banks);
 		void checkTemperature(UInt32 idx, UInt32 bank_i);
 		void finishInvalidation();
+		void clearCacheStats() {tot_reads = tot_writes = tot_misses = 0;};
 
 	private:
 		UInt32 *bankRemap;

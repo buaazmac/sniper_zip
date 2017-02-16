@@ -125,6 +125,8 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 	}
 
 	m_vremap_table = new VaultRemappingStructure(vaults_num);
+
+	tot_reads = tot_writes = tot_misses;
 	
 }
 
@@ -199,7 +201,7 @@ StackedDramPerfUnison::getAccessLatency(
 	UInt32 remapVault = m_vremap_table->getVaultIdx(vault_i, &valid_v);
 	UInt32 remapBank = m_vremap_table->getBankIdx(vault_i, bank_i, &valid_b);
 	// Handle an access in remapping
-	m_vremap_table->accessOnce(vault_i, bank_i, access_type);
+	m_vremap_table->accessOnce(vault_i, bank_i, access_type, pkt_time);
 
 	//debug
 #ifdef LOG_OUTPUT

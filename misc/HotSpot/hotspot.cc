@@ -269,6 +269,44 @@ Hotspot::~Hotspot()
 {
 }
 
+void
+Hotspot::getNames(const char *file, char **names, int *len)
+{
+	FILE *fp;
+	if(!(fp = fopen(file, "r")))
+		fatal("unable to open power trace input file\n");
+	char line[LINE_SIZE], temp[LINE_SIZE], *src;
+	int i;
+
+	/* skip empty lines	*/
+	do {
+		/* read the entire line	*/
+		fgets(line, LINE_SIZE, fp);
+		if (feof(fp))
+			fatal("not enough names in trace file\n");
+		strcpy(temp, line);
+		src = strtok(temp, " \r\t\n");
+	} while (!src);
+
+	 /* new line not read yet	*/	
+	if(line[strlen(line)-1] != '\n')
+		fatal("line too long\n");
+
+	/* chop the names from the line read	*/
+	for(i=0,src=line; *src && i < MAX_UNITS; i++) {
+		if(!sscanf(src, "%s", names[i]))
+			fatal("invalid format of names\n");
+		src += strlen(names[i]);
+		while (isspace((int)*src))
+			src++;
+	}
+	if(*src && i == MAX_UNITS)
+		fatal("no. of units exceeded limit\n");
+
+	*len = i;
+	fclose(fp);
+}
+
 /*
 * init HotSpot
 */
@@ -283,8 +321,8 @@ Hotspot::initHotSpot(int argc, char **argv)
 /*
  * implementation of calculateTemperature
 */
-double*
-Hotspot::calculateTemperature(int argc, char **argv)
+void
+Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
 {
   int i, j, idx, base = 0, count = 0, n = 0;
   int num, size, lines = 0, do_transient = TRUE;
@@ -319,7 +357,7 @@ Hotspot::calculateTemperature(int argc, char **argv)
   int do_detailed_3D = FALSE; //BU_3D: do_detailed_3D, false by default
   if (!(argc >= 5 && argc % 2)) {
       usage(argc, argv);
-      return NULL;
+      return;
   }
 
   size = parse_cmdline(table, MAX_ENTRIES, argc, argv);
@@ -488,6 +526,8 @@ Hotspot::calculateTemperature(int argc, char **argv)
                     for(j=0; j < model->grid->layers[i].flp->n_units; j++) {
                         idx = get_blk_index(model->grid->layers[i].flp, names[count+j]);
                         vals[count+j] = temp[base+idx];
+						/* Debug */
+						//printf("[Hotspot] block name: %s, vals: %.5f\n", names[count+j], vals[count+j]);
                     }
                     count += model->grid->layers[i].flp->n_units;	
                 }	
@@ -552,12 +592,6 @@ Hotspot::calculateTemperature(int argc, char **argv)
     steady_state_temp(model, overall_power, steady_temp);
 
   /* print steady state results	*/
-  //BU_3D: Only print steady state results to stdout when DEBUG3D flag is not set
-#if DEBUG3D < 1
-  fprintf(stdout, "Unit\tSteady(Kelvin)\n");
-  dump_temp(model, steady_temp, "stdout");
-#endif //end->BU_3D
-
   /* dump steady state temperatures on to file if needed	*/
   if (strcmp(model->config->steady_file, NULLFILE))
     dump_temp(model, steady_temp, model->config->steady_file);
@@ -569,23 +603,20 @@ Hotspot::calculateTemperature(int argc, char **argv)
       strcmp(model->config->grid_steady_file, NULLFILE))
     dump_steady_temp_grid(model->grid, model->config->grid_steady_file);
 
-#if VERBOSE > 2
+  /* Get steady temperature for Sniper*/
   if (model->type == BLOCK_MODEL) {
-      if (do_transient) {
-          fprintf(stdout, "printing temp...\n");
-          dump_dvector(temp, model->block->n_nodes);
-      }
-      fprintf(stdout, "printing steady_temp...\n");
-      dump_dvector(steady_temp, model->block->n_nodes);
+    for(i=0; i < n; i++)
+      temp_rst[i] = vals[i] - 273.15;
   } else {
-      if (do_transient) {
-          fprintf(stdout, "printing temp...\n");
-          dump_dvector(temp, model->grid->total_n_blocks + EXTRA);
-      }
-      fprintf(stdout, "printing steady_temp...\n");
-      dump_dvector(steady_temp, model->grid->total_n_blocks + EXTRA);
+    for(i=0, count=0; i < model->grid->n_layers; i++) {
+        if(model->grid->layers[i].has_power) {
+            for(j=0; j < model->grid->layers[i].flp->n_units; j++) {
+                temp_rst[count+j] = vals[count+j] - 273.15;
+            }
+            count += model->grid->layers[i].flp->n_units;
+        }	
+    }
   }
-#endif
 
   /* cleanup	*/
   fclose(pin);
@@ -600,7 +631,7 @@ Hotspot::calculateTemperature(int argc, char **argv)
   free_dvector(overall_power);
   free_names(names);
   free_dvector(vals);
-  return temp;
+  return;
 }
 
 void

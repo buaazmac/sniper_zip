@@ -22,6 +22,8 @@
 #include <iostream>
 #include <fstream>
 
+#include "ramulator/dram_sim.h"
+
 class DramCachePageInfo
 {
 	public:
@@ -129,7 +131,7 @@ class StackDramCacheCntlrUnison
 		struct DramStats {
 			int reads;
 			int writes;
-			double misses;
+			int misses;
 		} dram_stats[32];
 
 		DramCacheSetInfoUnison* m_set_info;
@@ -152,6 +154,9 @@ class StackDramCacheCntlrUnison
 
 		//Performance model
 		StackedDramPerfUnison* m_dram_perf_model;
+		
+		//Dram Model (ramulator)
+		DramModel* m_dram_model;
 
 		StackDramCacheCntlrUnison(UInt32 set_num, UInt32 associativity, UInt32 blocksize, UInt32 pagesize);
 		~StackDramCacheCntlrUnison();

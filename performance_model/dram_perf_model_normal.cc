@@ -290,7 +290,17 @@ StackDramCacheCntlrUnison::StackDramCacheCntlrUnison(
 	m_row_size = 8;
 
 	m_dram_perf_model = new StackedDramPerfUnison(m_vault_num, m_vault_size, m_bank_size, m_row_size);
+	/*
+	   Initial DRAM stats
+	 */
 	Sim()->getStatsManager()->init_stacked_dram_unison(m_dram_perf_model);
+
+	/*
+	   Initial DRAM simulator (ramulator)
+	*/
+	char *ram_config_file = "./ramulator/configs/HBM-config.cfg";
+	m_dram_model = new DramModel(ram_config_file);
+
 }
 
 StackDramCacheCntlrUnison::~StackDramCacheCntlrUnison()
@@ -365,7 +375,30 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 	else
 		mem_op_type = Core::READ;
 
+	/* Try to acccess cache set*/
 	UInt8 hit = m_set[set_n]->accessAttempt(mem_op_type, page_tag, page_offset);
+
+	/*
+	   (ramulator)
+	   Here we can add Ramulator code
+	   * generate DRAM operation based on cache access results
+	   * get performance results
+	   ----CONFIGURATION----
+	   -Memory bandwidth
+	   -Channel
+	   -Bank
+	   ----INPUT----
+	   -DRAM address in HMC/HBM
+	   -need iteration
+	   ----OUTPUT----
+	   -Latency
+	   ----SOMETHING_ELSE----
+	   Handle the fine grained stats in new model
+	*/
+
+	/*
+	   
+	*/
 
 	// access tag need a read
 	dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 32, set_n, DramCntlrInterface::READ); 
@@ -427,13 +460,17 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 #endif
 
 	if (access_type == DramCntlrInterface::WRITE) {
+		m_dram_perf_model->tot_writes ++;
 		dram_stats[vault_i].writes ++;
 		if (hit == 0 || hit == 1) {
+			m_dram_perf_model->tot_misses ++;
 			dram_stats[vault_i].misses ++;
 		}
 	} else {
+		m_dram_perf_model->tot_reads ++;
 		dram_stats[vault_i].reads ++;
 		if (hit == 0 || hit == 1) {
+			m_dram_perf_model->tot_misses ++;
 			dram_stats[vault_i].misses ++;
 		}
 	}
@@ -497,6 +534,7 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 	m_dram_perf_model->finishInvalidation();
 
 	/**/
+	Sim()->getStatsManager()->updateCurrentTime(pkt_time);
 
 	return model_delay;
 }

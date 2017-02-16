@@ -67,9 +67,9 @@ def compute_dram_power(nread, nwrite, t, config):
     power_chip_stat = DRAM_POWER_STATIC + DRAM_POWER_STATIC_OFFCHIP_INTERFACE
   power_socket_dyn  = power_chip_dyn * chips_per_dimm * dimms_per_socket
   power_socket_stat = power_chip_stat * chips_per_dimm * dimms_per_socket
-  print 'dram clk:',  DRAM_CLOCK, ' ', 'read_power: ', DRAM_POWER_READ, 'write_power: ', DRAM_POWER_WRITE 
-  print ' chips_per_dimm: ', chips_per_dimm, 'dimms_per_socket: ', dimms_per_socket
-  print '[dram power result] %f, %f, %d' % (power_socket_dyn, power_socket_stat, sockets)
+#print 'dram clk:',  DRAM_CLOCK, ' ', 'read_power: ', DRAM_POWER_READ, 'write_power: ', DRAM_POWER_WRITE 
+# print ' chips_per_dimm: ', chips_per_dimm, 'dimms_per_socket: ', dimms_per_socket
+#  print '[dram power result] %f, %f, %d' % (power_socket_dyn, power_socket_stat, sockets)
   return (power_socket_dyn * sockets, power_socket_stat * sockets)
 
 
@@ -133,10 +133,10 @@ def get_all_names():
 def main(jobid, resultsdir, outputfile, powertype = 'dynamic', config = None, no_graph = False, partial = None, print_stack = True, return_data = False):
   tempfile = outputfile + '.xml'
 
-  print 'tempfile: ', tempfile
-  print 'jobid: ', jobid
-  print 'resultsdir: ', resultsdir
-  print 'partial: ', partial
+#print 'tempfile: ', tempfile
+#  print 'jobid: ', jobid
+#  print 'resultsdir: ', resultsdir
+#  print 'partial: ', partial
 
   results = sniper_lib.get_results(jobid, resultsdir, partial = partial)
   if config:

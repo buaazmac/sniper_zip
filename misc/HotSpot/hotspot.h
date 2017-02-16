@@ -8,6 +8,9 @@
 #include "temperature_block.h"
 #include "temperature_grid.h"
 
+char **alloc_names(int nr, int nc);
+void free_names(char **m);
+
 /* global configuration parameters for HotSpot	*/
 typedef struct global_config_t_st
 {
@@ -75,8 +78,9 @@ int do_detailed_3D = FALSE; //BU_3D: do_detailed_3D, false by default
  *          ../hotspot -c ../hotspot.config -f core_layer.flr -p $1/$2 -steady_file $1/$3 -model_type grid -grid_layer_file test_3D.lcf
  *          ../hotspot -c ../hotspot.config -init_file $1/$3 -f core_layer.flr -p $1/$2 -o $1/$4 -model_type grid -grid_layer_file test_3D.lcf -grid_steady_file $1/$5
  */
+void getNames(const char *file, char **names, int *len);
 void initHotSpot(int argc, char **argv);
-double* calculateTemperature(int argc, char **argv);
+void calculateTemperature(double *temp_rst, int argc, char **argv);
 void endHotSpot();
 };
 

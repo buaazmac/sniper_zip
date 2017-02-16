@@ -9,6 +9,12 @@
 
 #include "dram_bank.h"
 
+// Statistics
+struct VaultStatEntry {
+	SubsecondTime tACT, tPRE, tRD, tWR;
+	UInt32 reads, writes, row_hits;
+};
+
 class VaultPerfModel {
 	public:
 		UInt32 m_size; // Bytes
@@ -17,6 +23,7 @@ class VaultPerfModel {
 		UInt32 n_banks;
 		bool auto_ref;
 		BankPerfModel** m_banks_array;
+		VaultStatEntry stats;
 		
 		VaultPerfModel(UInt32 size, UInt32 bank_size, UInt32 row_size);
 		~VaultPerfModel();

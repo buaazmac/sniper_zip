@@ -136,7 +136,7 @@ class ThermalStats:
       self.power[('ru', core)] = get_power(power['Core'][core], 'Renaming Unit/')
     self.power[('processor', 0)] = get_power(power['Processor'])
     self.power[('dram', 0)] = get_power(power['DRAM'])
-    self.power[('L3', 0)] = get_power(power['L3'])
+    self.power[('L3', 0)] = get_power(power['L3'][0])
 
   def update_energy(self):
     if self.power and sim.stats.time() > self.time_last_energy:

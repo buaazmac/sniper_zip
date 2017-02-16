@@ -5,6 +5,10 @@ VaultPerfModel::VaultPerfModel(UInt32 size, UInt32 bank_size, UInt32 row_size)
 	  m_bank_size(bank_size),
 	  m_row_size(row_size)
 {
+	// Initialize performance statistic
+	stats.tACT = stats.tPRE = stats.tRD = stats.tWR = SubsecondTime::Zero();
+	stats.reads = stats.writes = stats.row_hits = 0;
+
 	auto_ref = false;
 	n_banks = m_size / bank_size;
 	m_banks_array = new BankPerfModel*[n_banks];
