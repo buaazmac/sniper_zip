@@ -1,5 +1,5 @@
-#ifndef __RAMCONFIG_H
-#define __RAMCONFIG_H
+#ifndef __RAM_CONFIG_H
+#define __RAM_CONFIG_H
 
 #include <string>
 #include <fstream>
@@ -20,7 +20,7 @@ private:
     int subarrays;
     int cpu_tick;
     int mem_tick;
-    int core_num = 0;
+    int core_num = 4;
     long expected_limit_insts = 0;
 
 public:

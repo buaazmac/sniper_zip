@@ -128,6 +128,12 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 
 	tot_reads = tot_writes = tot_misses;
 	
+	/*
+	   Initial DRAM simulator (ramulator)
+	*/
+	char *ram_config_file = "./ramulator/configs/HBM-config.cfg";
+	m_dram_model = new DramModel(ram_config_file);
+	first_req = true;
 }
 
 StackedDramPerfUnison::~StackedDramPerfUnison()
@@ -178,6 +184,7 @@ StackedDramPerfUnison::~StackedDramPerfUnison()
 
 	delete [] m_vaults_array;
 	delete m_vremap_table;
+	delete m_dram_model;
 }
 
 SubsecondTime
@@ -187,6 +194,13 @@ StackedDramPerfUnison::getAccessLatency(
 						UInt32 set_i, 
 						DramCntlrInterface::access_t access_type)
 {
+	// bandwidth of DRAM, decides how many request we need
+	UInt32 bandwidth = 128;
+	UInt32 req_times = pkt_size / bandwidth;
+	if (req_times < 1) {
+		req_times = 1;
+	}
+
 	UInt32 vault_bit = floorLog2(n_vaults);
 	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
 	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
@@ -223,8 +237,78 @@ StackedDramPerfUnison::getAccessLatency(
 
 	SubsecondTime process_latency = SubsecondTime::Zero();
 
-	process_latency += vault->processRequest(pkt_time, access_type, remapBank, row_i);
+	//process_latency += vault->processRequest(pkt_time, access_type, remapBank, row_i);
 
+	/*
+	   (ramulator)
+	   Here we can add Ramulator code
+	   * generate DRAM operation based on cache access results
+	   * get performance results
+	   ----CONFIGURATION----
+	   -Memory bandwidth
+	   -Channel
+	   -Bank
+	   ----INPUT----
+	   -DRAM address in HMC/HBM
+	   -need iteration
+	   ----OUTPUT----
+	   -Latency
+	   ----SOMETHING_ELSE----
+	   Handle the fine grained stats in new model
+	*/
+	// First we need tick memory during the idle time
+	UInt64 interval_ns = pkt_time.getNS() - last_req.getNS();
+	interval_ns /= int(m_dram_model->tCK);
+	/* Set the current time for ramulator
+	TODO: More concrete 
+	*/
+	UInt32 tot_clks = 0, idle_clks = 0;
+	last_req = pkt_time;
+	//std::cout << "[IDLE] here we have interval_ns: " << interval_ns << std::endl;
+
+	while (req_times > 0) {
+		req_times --;
+
+		bool stall = true;
+		UInt32 clks = 0;
+		if (access_type == DramCntlrInterface::READ) {
+			stall = !m_dram_model->readRow(remapVault, remapBank, row_i, 0);
+			m_dram_model->tickOnce();
+			clks++;
+			while (stall) {
+
+				std::cout << "here is a stall!!" << std::endl;
+
+				stall = !m_dram_model->readRow(remapVault, remapBank, row_i, 0);
+				m_dram_model->tickOnce();
+				clks++;
+			}
+		} else {
+			stall = !m_dram_model->writeRow(remapVault, remapBank, row_i, 0);
+			m_dram_model->tickOnce();
+			clks++;
+			while (stall) {
+
+				std::cout << "here is a stall!!" << std::endl;
+
+				stall = !m_dram_model->writeRow(remapVault, remapBank, row_i, 0);
+				m_dram_model->tickOnce();
+				clks++;
+			}
+		}
+		clks += m_dram_model->getReadLatency(remapVault);
+
+		UInt64 latency_ns = UInt64(m_dram_model->tCK) * clks;
+		process_latency += SubsecondTime::NS(latency_ns);
+		tot_clks += clks;
+	}
+#ifdef LOG_OUTPUT
+	log_file << "--Latency clks: " << tot_clks
+		     << ", idle clks: " << idle_clks
+			 << ", read latency: " << m_dram_model->getReadLatency(remapVault)
+			 << ", process_latency: " << process_latency.getNS()
+			 << std::endl;
+#endif
 	return process_latency;
 }
 
@@ -237,7 +321,6 @@ StackedDramPerfUnison::checkTemperature(UInt32 idx, UInt32 bank_i)
 		
 		bool valid = false;
 		UInt32 remap_id = m_vremap_table->getVaultIdx(idx, &valid);
-#define LOG_OUTPUT
 #ifdef LOG_OUTPUT
 		log_file << "@Vault_" << idx << " is too hot!\n";
 		log_file << "@original map: " 
@@ -280,6 +363,24 @@ StackedDramPerfUnison::finishInvalidation()
 {
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		m_vremap_table->setValid(i);
+	}
+}
+
+void
+StackedDramPerfUnison::updateStats()
+{
+	for (UInt32 i = 0; i < n_vaults; i++) {
+		VaultPerfModel* vault = m_vaults_array[i];
+		vault->stats.reads = m_dram_model->getVaultRdReq(i);
+		vault->stats.writes = m_dram_model->getVaultWrReq(i);
+		vault->stats.row_hits = m_dram_model->getVaultRowHits(i);
+		for (UInt32 j = 0; j < vault->n_banks; j++) {
+			BankPerfModel* bank = vault->m_banks_array[j];
+			bank->stats.tACT = SubsecondTime::NS(m_dram_model->getBankActTime(i, j));
+			bank->stats.tPRE = SubsecondTime::NS(m_dram_model->getBankActTime(i, j));
+			bank->stats.tRD = SubsecondTime::NS(m_dram_model->getBankRdTime(i, j));
+			bank->stats.tWR = SubsecondTime::NS(m_dram_model->getBankWrTime(i, j));
+		}
 	}
 }
 
@@ -378,7 +479,6 @@ StackedDramPerfAlloy::getAccessLatency(
 	UInt32 remapVault = m_vremap_table->getVaultIdx(vault_i, &valid);
 
 	//debug
-#define LOG_OUTPUT
 #ifdef LOG_OUTPUT
 	log_file << "Set num: " << set_i 
 			  << ", vault_i: " << vault_i

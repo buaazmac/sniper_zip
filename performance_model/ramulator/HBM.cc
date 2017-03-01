@@ -1,5 +1,5 @@
 #include "HBM.h"
-#include "DRAM.h"
+#include "RamDRAM.h"
 
 #include <vector>
 #include <functional>
@@ -79,7 +79,7 @@ void HBM::init_speed()
 void HBM::init_prereq()
 {
     // RD
-    prereq[int(Level::Rank)][int(Command::RD)] = [] (DRAM* node, Command cmd, int id) {
+    prereq[int(Level::Rank)][int(Command::RD)] = [] (RamDRAM* node, Command cmd, int id) {
         switch (int(node->state)) {
             case int(State::PowerUp): return Command::MAX;
             case int(State::ActPowerDown): return Command::PDX;
@@ -87,7 +87,7 @@ void HBM::init_prereq()
             case int(State::SelfRefresh): return Command::SRX;
             default: assert(false);
         }};
-    prereq[int(Level::Bank)][int(Command::RD)] = [] (DRAM* node, Command cmd, int id) {
+    prereq[int(Level::Bank)][int(Command::RD)] = [] (RamDRAM* node, Command cmd, int id) {
         switch (int(node->state)) {
             case int(State::Closed): return Command::ACT;
             case int(State::Opened):
@@ -102,7 +102,7 @@ void HBM::init_prereq()
     prereq[int(Level::Bank)][int(Command::WR)] = prereq[int(Level::Bank)][int(Command::RD)];
 
     // REF
-    prereq[int(Level::Rank)][int(Command::REF)] = [] (DRAM* node, Command cmd, int id) {
+    prereq[int(Level::Rank)][int(Command::REF)] = [] (RamDRAM* node, Command cmd, int id) {
         for (auto bg : node->children)
             for (auto bank: bg->children) {
                 if (bank->state == State::Closed)
@@ -112,12 +112,12 @@ void HBM::init_prereq()
         return Command::REF;};
 
     // REFSB
-    prereq[int(Level::Bank)][int(Command::REFSB)] = [] (DRAM* node, Command cmd, int id) {
+    prereq[int(Level::Bank)][int(Command::REFSB)] = [] (RamDRAM* node, Command cmd, int id) {
         if (node->state == State::Closed) return Command::REFSB;
         return Command::PRE;};
 
     // PD
-    prereq[int(Level::Rank)][int(Command::PDE)] = [] (DRAM* node, Command cmd, int id) {
+    prereq[int(Level::Rank)][int(Command::PDE)] = [] (RamDRAM* node, Command cmd, int id) {
         switch (int(node->state)) {
             case int(State::PowerUp): return Command::PDE;
             case int(State::ActPowerDown): return Command::PDE;
@@ -127,7 +127,7 @@ void HBM::init_prereq()
         }};
 
     // SR
-    prereq[int(Level::Rank)][int(Command::SRE)] = [] (DRAM* node, Command cmd, int id) {
+    prereq[int(Level::Rank)][int(Command::SRE)] = [] (RamDRAM* node, Command cmd, int id) {
         switch (int(node->state)) {
             case int(State::PowerUp): return Command::SRE;
             case int(State::ActPowerDown): return Command::PDX;
@@ -141,7 +141,7 @@ void HBM::init_prereq()
 void HBM::init_rowhit()
 {
     // RD
-    rowhit[int(Level::Bank)][int(Command::RD)] = [] (DRAM* node, Command cmd, int id) {
+    rowhit[int(Level::Bank)][int(Command::RD)] = [] (RamDRAM* node, Command cmd, int id) {
         switch (int(node->state)) {
             case int(State::Closed): return false;
             case int(State::Opened):
@@ -158,7 +158,7 @@ void HBM::init_rowhit()
 void HBM::init_rowopen()
 {
     // RD
-    rowopen[int(Level::Bank)][int(Command::RD)] = [] (DRAM* node, Command cmd, int id) {
+    rowopen[int(Level::Bank)][int(Command::RD)] = [] (RamDRAM* node, Command cmd, int id) {
         switch (int(node->state)) {
             case int(State::Closed): return false;
             case int(State::Opened): return true;
@@ -171,28 +171,28 @@ void HBM::init_rowopen()
 
 void HBM::init_lambda()
 {
-    lambda[int(Level::Bank)][int(Command::ACT)] = [] (DRAM* node, int id) {
+    lambda[int(Level::Bank)][int(Command::ACT)] = [] (RamDRAM* node, int id) {
         node->state = State::Opened;
         node->row_state[id] = State::Opened;};
-    lambda[int(Level::Bank)][int(Command::PRE)] = [] (DRAM* node, int id) {
+    lambda[int(Level::Bank)][int(Command::PRE)] = [] (RamDRAM* node, int id) {
         node->state = State::Closed;
         node->row_state.clear();};
-    lambda[int(Level::Rank)][int(Command::PREA)] = [] (DRAM* node, int id) {
+    lambda[int(Level::Rank)][int(Command::PREA)] = [] (RamDRAM* node, int id) {
         for (auto bg : node->children)
             for (auto bank : bg->children) {
                 bank->state = State::Closed;
                 bank->row_state.clear();
             }};
-    lambda[int(Level::Rank)][int(Command::REF)] = [] (DRAM* node, int id) {};
-    lambda[int(Level::Bank)][int(Command::RD)] = [] (DRAM* node, int id) {};
-    lambda[int(Level::Bank)][int(Command::WR)] = [] (DRAM* node, int id) {};
-    lambda[int(Level::Bank)][int(Command::RDA)] = [] (DRAM* node, int id) {
+    lambda[int(Level::Rank)][int(Command::REF)] = [] (RamDRAM* node, int id) {};
+    lambda[int(Level::Bank)][int(Command::RD)] = [] (RamDRAM* node, int id) {};
+    lambda[int(Level::Bank)][int(Command::WR)] = [] (RamDRAM* node, int id) {};
+    lambda[int(Level::Bank)][int(Command::RDA)] = [] (RamDRAM* node, int id) {
         node->state = State::Closed;
         node->row_state.clear();};
-    lambda[int(Level::Bank)][int(Command::WRA)] = [] (DRAM* node, int id) {
+    lambda[int(Level::Bank)][int(Command::WRA)] = [] (RamDRAM* node, int id) {
         node->state = State::Closed;
         node->row_state.clear();};
-    lambda[int(Level::Rank)][int(Command::PDE)] = [] (DRAM* node, int id) {
+    lambda[int(Level::Rank)][int(Command::PDE)] = [] (RamDRAM* node, int id) {
         for (auto bg : node->children)
             for (auto bank : bg->children) {
                 if (bank->state == State::Closed)
@@ -201,11 +201,11 @@ void HBM::init_lambda()
                 return;
             }
         node->state = State::PrePowerDown;};
-    lambda[int(Level::Rank)][int(Command::PDX)] = [] (DRAM* node, int id) {
+    lambda[int(Level::Rank)][int(Command::PDX)] = [] (RamDRAM* node, int id) {
         node->state = State::PowerUp;};
-    lambda[int(Level::Rank)][int(Command::SRE)] = [] (DRAM* node, int id) {
+    lambda[int(Level::Rank)][int(Command::SRE)] = [] (RamDRAM* node, int id) {
         node->state = State::SelfRefresh;};
-    lambda[int(Level::Rank)][int(Command::SRX)] = [] (DRAM* node, int id) {
+    lambda[int(Level::Rank)][int(Command::SRX)] = [] (RamDRAM* node, int id) {
         node->state = State::PowerUp;};
 }
 
@@ -310,8 +310,9 @@ void HBM::init_timing()
     t[int(Command::SRX)].push_back({Command::SRE, 1, s.nXS});
 
     /*** Bank Group ***/
-    t = timing[int(Level::BankGroup)];
+    //t = timing[int(Level::BankGroup)];
     // CAS <-> CAS
+	/*
     t[int(Command::RD)].push_back({Command::RD, 1, s.nCCDL});
     t[int(Command::RD)].push_back({Command::RDA, 1, s.nCCDL});
     t[int(Command::RDA)].push_back({Command::RD, 1, s.nCCDL});
@@ -328,7 +329,7 @@ void HBM::init_timing()
     t[int(Command::WR)].push_back({Command::RDA, 1, s.nCWL + s.nBL + s.nWTRL});
     t[int(Command::WRA)].push_back({Command::RD, 1, s.nCWL + s.nBL + s.nWTRL});
     t[int(Command::WRA)].push_back({Command::RDA, 1, s.nCWL + s.nBL + s.nWTRL});
-
+	*/
     // RAS <-> RAS
     t[int(Command::ACT)].push_back({Command::ACT, 1, s.nRRDL});
 

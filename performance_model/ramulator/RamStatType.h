@@ -1,5 +1,5 @@
-#ifndef __STATTYPE_H
-#define __STATTYPE_H
+#ifndef __RAM_STATTYPE_H
+#define __RAM_STATTYPE_H
 
 #include <limits>
 #include <fstream>

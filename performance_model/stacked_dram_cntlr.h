@@ -19,6 +19,8 @@
 #include <iostream>
 #include <fstream>
 
+#include "ramulator/dram_sim.h"
+
 class VaultRemappingStructure;
 class BankRemappingStructure;
 
@@ -47,8 +49,14 @@ class StackedDramPerfUnison {
 		UInt32 m_row_size;
 		int tot_reads, tot_writes, tot_misses;
 
+		SubsecondTime last_req = SubsecondTime::Zero();
+
 		/* structure for vault remapping*/
 		VaultRemappingStructure *m_vremap_table;
+
+		//Dram Model (ramulator)
+		DramModel* m_dram_model;
+		bool first_req;
 
 		VaultPerfModel** m_vaults_array;
 		std::ofstream log_file;
@@ -61,6 +69,7 @@ class StackedDramPerfUnison {
 		void checkDramValid(bool *valid_arr, int *banks);
 		void checkTemperature(UInt32 idx, UInt32 bank_i);
 		void finishInvalidation();
+		void updateStats();
 		void clearCacheStats() {tot_reads = tot_writes = tot_misses = 0;};
 
 	private:

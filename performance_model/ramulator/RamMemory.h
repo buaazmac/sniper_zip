@@ -1,11 +1,11 @@
-#ifndef __MEMORY_H
-#define __MEMORY_H
+#ifndef __RAM_MEMORY_H
+#define __RAM_MEMORY_H
 
 #include "RamConfig.h"
-#include "DRAM.h"
-#include "Request.h"
-#include "Controller.h"
-#include "Statistics.h"
+#include "RamDRAM.h"
+#include "RamRequest.h"
+#include "RamController.h"
+#include "RamStatistics.h"
 
 #include "HBM.h"
 
@@ -28,16 +28,16 @@ public:
     virtual ~MemoryBase() {}
     virtual double clk_ns() = 0;
     virtual void tick() = 0;
-    virtual bool send(Request req) = 0;
+    virtual bool send(RamRequest req) = 0;
     virtual int pending_requests() = 0;
     virtual void finish(void) = 0;
     virtual long page_allocator(long addr, int coreid) = 0;
     virtual void record_core(int coreid) = 0;
 };
 
-class Memory : public MemoryBase
+class RamMemory : public MemoryBase
 {
-protected:
+public:
   ScalarStat dram_capacity;
   ScalarStat num_dram_cycles;
   ScalarStat num_incoming_requests;
@@ -56,13 +56,8 @@ protected:
   ScalarStat in_queue_read_req_num_avg;
   ScalarStat in_queue_write_req_num_avg;
 
-#ifndef INTEGRATED_WITH_GEM5
-  VectorStat record_read_requests;
-  VectorStat record_write_requests;
-#endif
-
   long max_address;
-public:
+
     enum class Type {
         ChRaBaRoCo,
         RoBaRaCoCh,
@@ -84,13 +79,13 @@ public:
     long free_physical_pages_remaining;
     map<pair<int, long>, long> page_translation;
 
-    vector<Controller*> ctrls;
+    vector<RamController*> ctrls;
     HBM * spec;
     vector<int> addr_bits;
 
     int tx_bits;
 
-    Memory(const RamConfig& configs, vector<Controller*> ctrls)
+    RamMemory(const RamConfig& configs, vector<RamController*> ctrls)
         : ctrls(ctrls),
           spec(ctrls[0]->channel->spec),
           addr_bits(int(Level::MAX))
@@ -147,6 +142,7 @@ public:
             .desc("Number of incoming requests to DRAM")
             .precision(0)
             ;
+		
         num_read_requests
             .init(configs.get_core_num())
             .name("read_requests")
@@ -159,6 +155,8 @@ public:
             .desc("Number of incoming write requests to DRAM per core")
             .precision(0)
             ;
+		
+		cout << "sz[int(channel)]: " << sz[int(Level::Channel)] << endl;
         incoming_requests_per_channel
             .init(sz[int(Level::Channel)])
             .name("incoming_requests_per_channel")
@@ -215,23 +213,10 @@ public:
             .desc("Average of write queue length per memory cycle")
             .precision(6)
             ;
-#ifndef INTEGRATED_WITH_GEM5
-        record_read_requests
-            .init(configs.get_core_num())
-            .name("record_read_requests")
-            .desc("record read requests for this core when it reaches request limit or to the end")
-            ;
-
-        record_write_requests
-            .init(configs.get_core_num())
-            .name("record_write_requests")
-            .desc("record write requests for this core when it reaches request limit or to the end")
-            ;
-#endif
 
     }
 
-    ~Memory()
+    ~RamMemory()
     {
         for (auto ctrl: ctrls)
             delete ctrl;
@@ -244,10 +229,6 @@ public:
     }
 
     void record_core(int coreid) {
-#ifndef INTEGRATED_WITH_GEM5
-      record_read_requests[coreid] = num_read_requests[coreid];
-      record_write_requests[coreid] = num_write_requests[coreid];
-#endif
       for (auto ctrl : ctrls) {
         ctrl->record_core(coreid);
       }
@@ -278,14 +259,14 @@ public:
         }
     }
 
-    bool send(Request req)
+    bool send(RamRequest req)
     {
         req.addr_vec.resize(addr_bits.size());
         long addr = req.addr;
         int coreid = req.coreid;
 
         // Each transaction size is 2^tx_bits, so first clear the lowest tx_bits bits
-        clear_lower_bits(addr, tx_bits);
+        //clear_lower_bits(addr, tx_bits);
 
         switch(int(type)){
             case int(Type::ChRaBaRoCo):
@@ -302,14 +283,24 @@ public:
                 assert(false);
         }
 
+		/* For Debug
+		cout << "[Memory.h] Here we receive a request! " << req.addr << endl;
+		cout << "    After address mapping: ";
+
+		for (auto ad : req.addr_vec) {
+			cout << ad << ' ';
+		}
+		cout << endl;
+		*/
+
         if(ctrls[req.addr_vec[0]]->enqueue(req)) {
             // tally stats here to avoid double counting for requests that aren't enqueued
             ++num_incoming_requests;
-            if (req.type == Request::Type::READ) {
+            if (req.type == RamRequest::Type::READ) {
               ++num_read_requests[coreid];
               ++incoming_read_reqs_per_channel[req.addr_vec[int(Level::Channel)]];
             }
-            if (req.type == Request::Type::WRITE) {
+            if (req.type == RamRequest::Type::WRITE) {
               ++num_write_requests[coreid];
             }
             ++incoming_requests_per_channel[req.addr_vec[int(Level::Channel)]];

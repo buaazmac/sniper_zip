@@ -1,5 +1,5 @@
-#ifndef __REQUEST_H
-#define __REQUEST_H
+#ifndef __RAM_REQUEST_H
+#define __RAM_REQUEST_H
 
 #include <vector>
 #include <functional>
@@ -9,7 +9,7 @@ using namespace std;
 namespace ramulator
 {
 
-class Request
+class RamRequest
 {
 public:
     bool is_first_command;
@@ -32,19 +32,19 @@ public:
 
     long arrive = -1;
     long depart;
-    function<void(Request&)> callback; // call back with more info
+    function<void(RamRequest&)> callback; // call back with more info
 
-    Request(long addr, Type type, int coreid = 0)
+    RamRequest(long addr, Type type, int coreid = 0)
         : is_first_command(true), addr(addr), coreid(coreid), type(type),
-      callback([](Request& req){}) {}
+      callback([](RamRequest& req){}) {}
 
-    Request(long addr, Type type, function<void(Request&)> callback, int coreid = 0)
+    RamRequest(long addr, Type type, function<void(RamRequest&)> callback, int coreid = 0)
         : is_first_command(true), addr(addr), coreid(coreid), type(type), callback(callback) {}
 
-    Request(vector<int>& addr_vec, Type type, function<void(Request&)> callback, int coreid = 0)
+    RamRequest(vector<int>& addr_vec, Type type, function<void(RamRequest&)> callback, int coreid = 0)
         : is_first_command(true), addr_vec(addr_vec), coreid(coreid), type(type), callback(callback) {}
 
-    Request()
+    RamRequest()
         : is_first_command(true), coreid(0) {}
 };
 

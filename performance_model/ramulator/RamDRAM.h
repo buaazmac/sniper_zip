@@ -1,7 +1,7 @@
-#ifndef __DRAM_H
-#define __DRAM_H
+#ifndef __RAM_DRAM_H
+#define __RAM_DRAM_H
 
-#include "Statistics.h"
+#include "RamStatistics.h"
 #include <iostream>
 #include <vector>
 #include <deque>
@@ -25,7 +25,7 @@ struct TimingEntry;
 enum class Org;
 enum class Speed;
 
-class DRAM
+class RamDRAM
 {
 public:
     ScalarStat active_cycles;
@@ -36,9 +36,12 @@ public:
     ScalarStat serving_requests;
     ScalarStat average_serving_requests;
 
+	ScalarStat serving_reads;
+	ScalarStat serving_writes;
+
     // Constructor
-    DRAM(HBM* spec, Level level);
-    ~DRAM();
+    RamDRAM(HBM* spec, Level level);
+    ~RamDRAM();
 
     // Specification (e.g., DDR3)
     HBM* spec;
@@ -47,8 +50,8 @@ public:
     Level level;
     int id;
     long size;
-    DRAM* parent;
-    vector<DRAM*> children;
+    RamDRAM* parent;
+    vector<RamDRAM*> children;
 
     // State (e.g., Opened, Closed)
     State state;
@@ -59,7 +62,7 @@ public:
     map<int, State> row_state;
 
     // Insert a node as one of my child nodes
-    void insert(DRAM* child);
+    void insert(RamDRAM* child);
 
     // Decode a command into its "prerequisite" command (if any is needed)
     Command decode(Command cmd, const int* addr);
@@ -99,7 +102,7 @@ public:
 
 private:
     // Constructor
-    DRAM() {};
+    RamDRAM() {};
 
     // Timing
     long cur_clk = 0;
@@ -110,17 +113,17 @@ private:
 
     // Lookup table for which commands must be preceded by which other commands (i.e., "prerequisite")
     // E.g., a read command to a closed bank must be preceded by an activate command
-    function<Command(DRAM*, Command cmd, int)>* prereq;
+    function<Command(RamDRAM*, Command cmd, int)>* prereq;
 
     // SAUGATA: added table for row hits
     // Lookup table for whether a command is a row hit
     // E.g., a read command to a closed bank must be preceded by an activate command
-    function<bool(DRAM*, Command cmd, int)>* rowhit;
-    function<bool(DRAM*, Command cmd, int)>* rowopen;
+    function<bool(RamDRAM*, Command cmd, int)>* rowhit;
+    function<bool(RamDRAM*, Command cmd, int)>* rowopen;
 
     // Lookup table between commands and the state transitions they trigger
     // E.g., an activate command to a closed bank opens both the bank and the row
-    function<void(DRAM*, int)>* lambda;
+    function<void(RamDRAM*, int)>* lambda;
 
     // Lookup table for timing parameters
     // E.g., activate->precharge: tRAS@bank, activate->activate: tRC@bank

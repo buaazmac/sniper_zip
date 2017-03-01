@@ -288,18 +288,16 @@ StackDramCacheCntlrUnison::StackDramCacheCntlrUnison(
 	m_vault_size = 128 * 1024;
 	m_bank_size = 16 * 1024;
 	m_row_size = 8;
+	// Statistics for simulating memory operation
+	page_misses = block_misses = wb_blocks = 0;
+	// Choose Invalidation/Migration mechanism
+	remap_invalid = true;
 
 	m_dram_perf_model = new StackedDramPerfUnison(m_vault_num, m_vault_size, m_bank_size, m_row_size);
 	/*
 	   Initial DRAM stats
 	 */
 	Sim()->getStatsManager()->init_stacked_dram_unison(m_dram_perf_model);
-
-	/*
-	   Initial DRAM simulator (ramulator)
-	*/
-	char *ram_config_file = "./ramulator/configs/HBM-config.cfg";
-	m_dram_model = new DramModel(ram_config_file);
 
 }
 
@@ -378,32 +376,17 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 	/* Try to acccess cache set*/
 	UInt8 hit = m_set[set_n]->accessAttempt(mem_op_type, page_tag, page_offset);
 
-	/*
-	   (ramulator)
-	   Here we can add Ramulator code
-	   * generate DRAM operation based on cache access results
-	   * get performance results
-	   ----CONFIGURATION----
-	   -Memory bandwidth
-	   -Channel
-	   -Bank
-	   ----INPUT----
-	   -DRAM address in HMC/HBM
-	   -need iteration
-	   ----OUTPUT----
-	   -Latency
-	   ----SOMETHING_ELSE----
-	   Handle the fine grained stats in new model
-	*/
 
 	/*
 	   
 	*/
 
 	// access tag need a read
-	dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 32, set_n, DramCntlrInterface::READ); 
+	dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, DramCntlrInterface::READ); 
 
 	if (hit == 0) { // page is not in cache
+		page_misses ++;
+
 		m_set[set_n]->reads++;
 		UInt32 index = m_set[set_n]->getReplacementIndex();
 		// page eviction
@@ -413,7 +396,6 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 		   3. set pc & offset bits
 		   4. update footprint history table
 		   */
-		dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 32, set_n, DramCntlrInterface::WRITE); 
 
 		// page eviction & load new page
 		m_set[set_n]->updateReplacementIndexTag(index, page_tag, pc, page_offset, footprint);
@@ -421,6 +403,15 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 		// update footprint history table
 		UInt32 new_footprint = m_set[set_n]->m_cache_page_info_array[index]->getFootprint();
 		FHT[block_num] = new_footprint;
+		UInt32 load_blocks = 0;
+		while (new_footprint > 0) {
+			if (new_footprint & 1 == 1) {
+				load_blocks++;
+			}
+			new_footprint >>= 1;
+		}
+		wb_blocks += load_blocks;
+		dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64 * load_blocks, set_n, DramCntlrInterface::WRITE); 
 
 		// calculate model delay (page load): load a page (1 page = 1984 B)
 		// 1 write = 2 read
@@ -428,20 +419,20 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 		//model_delay += m_dram_bandwidth.getRoundedLatency(1984);
 		model_delay += m_dram_bandwidth.getRoundedLatency(8 * 2 * 1024);
 	} else if (hit == 1) { // page is in cache, but block is not
+		block_misses ++;
 		// we need to load block from memory
 		// we also need to update page's footprint
 		
 		// calculate model delay (block load): load a block
 	    //model_delay += m_dram_bandwidth.getRoundedLatency(64);
 	    //model_delay += m_dram_bandwidth.getRoundedLatency(64);
-		dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 32, set_n, DramCntlrInterface::WRITE); 
+		dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, DramCntlrInterface::WRITE); 
 
 		model_delay += m_dram_bandwidth.getRoundedLatency(8 * 32);
 	} 
 
-	dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 32, set_n, access_type); 
+	dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, access_type); 
 
-	model_delay += dram_delay;
 
 	UInt32 vault_bit = floorLog2(m_vault_num);
 	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
@@ -449,15 +440,6 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 	UInt32 vault_i = (set_n >> row_bit) & ((1UL << vault_bit) - 1);
 	UInt32 bank_i = (set_n >> row_bit >> vault_bit) & ((1 << bank_bit) - 1);
 
-#ifdef ADDR_LOG
-	UInt32 hit_i32 = hit;
-	log_file << "-address: " << address
-			 << ", set: " << set_n
-			 << ", page_tag: " << page_tag
-			 << ", page_offset: " << page_offset 
-			 << ", hit: " << hit_i32
-			 << std::endl;
-#endif
 
 	if (access_type == DramCntlrInterface::WRITE) {
 		m_dram_perf_model->tot_writes ++;
@@ -496,7 +478,6 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 			int b_valid = b_valid_arr[i];
 			for (UInt32 bank_i = 0; bank_i < bank_num; bank_i++) {
 				if (((b_valid >> bank_i) & 1) == 0) {
-					#define INVALID_LOG
 					#ifdef INVALID_LOG
 					log_file << "INVALID BANK #" << i << "_" << bank_i << std::endl;
 					#endif
@@ -504,7 +485,12 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 						UInt32 set_i = bank_i << vault_bit << row_bit;
 						set_i |= (i << row_bit);
 						set_i |= row_i;
-						m_set[set_i]->invalidateContent();
+						if (remap_invalid) {
+							m_set[set_i]->invalidateContent();
+						} else {
+							dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::WRITE); 
+							dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::READ); 
+						}
 					}
 				}
 			}
@@ -515,7 +501,6 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 
 			//std::cout << "Core0's Power: " << Sim()->getStatsManager()->getMetricObject("core", 0, "energy-dynamic")->recordMetric() << std::endl;
 
-			#define INVALID_LOG
 			#ifdef INVALID_LOG
 			log_file << "INVALID VAULT #" << i << std::endl;
 			#endif
@@ -525,14 +510,31 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 					UInt32 set_i = bank_i << vault_bit << row_bit;
 					set_i |= (i << row_bit);
 					set_i |= row_i;
-					m_set[set_i]->invalidateContent();
+					if (remap_invalid) {
+						m_set[set_i]->invalidateContent();
+					} else {
+						dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::WRITE); 
+						dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::READ); 
+					}
 				}
 			}
 		}
 	}
 
+#ifdef ADDR_LOG
+	UInt32 hit_i32 = hit;
+	log_file << "-address: " << address
+			 << ", set: " << set_n
+			 << ", page_tag: " << page_tag
+			 << ", page_offset: " << page_offset 
+			 << ", hit: " << hit_i32
+			 << ", latency: " << dram_delay.getNS()
+			 << std::endl;
+#endif
 	m_dram_perf_model->finishInvalidation();
+	m_dram_perf_model->updateStats();
 
+	model_delay += dram_delay;
 	/**/
 	Sim()->getStatsManager()->updateCurrentTime(pkt_time);
 

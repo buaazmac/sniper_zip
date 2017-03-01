@@ -168,9 +168,9 @@ BankRemappingStructure::isTooHot(UInt32 phy_vault_i, UInt32 idx)
 	UInt32 phy_bank_i = getBankIdx(idx, &valid);
 	double bank_temp = Sim()->getStatsManager()->getDramBankTemp(phy_vault_i, phy_bank_i);
 
-	double update_time = 0.5;
+	double update_time = 0.01;
 
-	if (access_rate > 200 && interval_ms > update_time) {
+	if (access_rate > 1000 && interval_ms > update_time) {
 		printf("---bank_%d is ACCESSED TOO FREQUENTLY! %.5f accesses in %.5f ms\n", phy_bank_i, access_rate, interval_ms);
 		if (0) {
 			printf("---bank_%d is about to be swapped!\n", phy_bank_i);

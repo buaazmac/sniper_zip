@@ -13,15 +13,15 @@
  *      Author: kevincha
  */
 
-#ifndef __REFRESH_H_
-#define __REFRESH_H_
+#ifndef __RAM_REFRESH_H_
+#define __RAM_REFRESH_H_
 
 #include <stddef.h>
 #include <cassert>
 #include <iostream>
 #include <vector>
 
-#include "Request.h"
+#include "RamRequest.h"
 
 using namespace std;
 using namespace ramulator;
@@ -30,11 +30,11 @@ namespace ramulator {
 
 class HBM;
 
-class Controller;
+class RamController;
 
 class Refresh {
 public:
-  Controller* ctrl;
+  RamController* ctrl;
   long clk, refreshed;
   // Per-bank refresh counter to track the refresh progress for each rank
   vector<int> bank_ref_counters;
@@ -42,7 +42,7 @@ public:
   int level_chan, level_rank, level_bank, level_sa;
 
   // ctor
-  Refresh(Controller* ctrl);
+  Refresh(RamController* ctrl);
 
   // dtor
   virtual ~Refresh() {
@@ -67,7 +67,7 @@ private:
   bool ctrl_write_mode = false;
 
   // Refresh based on the specified address
-  void refresh_target(Controller* ctrl, int rank, int bank, int sa);
+  void refresh_target(RamController* ctrl, int rank, int bank, int sa);
 
   // Inject refresh at either rank or bank level
   void inject_refresh(bool b_ref_rank);

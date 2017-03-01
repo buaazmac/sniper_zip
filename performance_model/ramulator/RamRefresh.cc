@@ -9,16 +9,16 @@
 
 #include <stdlib.h>
 
-#include "Refresh.h"
-#include "Controller.h"
-#include "DRAM.h"
+#include "RamRefresh.h"
+#include "RamController.h"
+#include "RamDRAM.h"
 
 using namespace std;
 using namespace ramulator;
 
 namespace ramulator {
   // ctor
-	Refresh::Refresh(Controller* ctrl) : ctrl(ctrl) {
+	Refresh::Refresh(RamController* ctrl) : ctrl(ctrl) {
     clk = refreshed = 0;
     max_rank_count = ctrl->channel->children.size();
     max_bank_count = ctrl->channel->spec->org_entry.count[(int)Level::Bank];
@@ -49,14 +49,14 @@ namespace ramulator {
     }
   }
   // Refresh based on the specified address
-  void Refresh::refresh_target(Controller* ctrl, int rank, int bank, int sa)
+  void Refresh::refresh_target(RamController* ctrl, int rank, int bank, int sa)
   {
     vector<int> addr_vec(int(Level::MAX), -1);
     addr_vec[0] = ctrl->channel->id;
     addr_vec[1] = rank;
     addr_vec[2] = bank;
     addr_vec[3] = sa;
-    Request req(addr_vec, Request::Type::REFRESH, NULL);
+    RamRequest req(addr_vec, RamRequest::Type::REFRESH, NULL);
     bool res = ctrl->enqueue(req);
     assert(res);
   }

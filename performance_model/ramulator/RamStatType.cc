@@ -1,4 +1,4 @@
-#include "StatType.h"
+#include "RamStatType.h"
 
 namespace Stats {
 

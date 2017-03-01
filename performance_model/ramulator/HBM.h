@@ -1,8 +1,8 @@
 #ifndef __HBM_H
 #define __HBM_H
 
-#include "DRAM.h"
-#include "Request.h"
+#include "RamDRAM.h"
+#include "RamRequest.h"
 #include <vector>
 #include <functional>
 
@@ -15,7 +15,7 @@ namespace ramulator
     /* Level */
     enum class Level : int
     {
-        Channel, Rank, BankGroup, Bank, Row, Column, MAX
+        Channel, Rank, Bank, Row, Column, MAX
     };
 
     /* Command */
@@ -53,7 +53,7 @@ namespace ramulator
         HBM_1Gbps,
         MAX
     };
-class DRAM;
+class RamDRAM;
 
 class HBM
 {
@@ -62,8 +62,8 @@ public:
     HBM(Org org, Speed speed);
     HBM(const string& org_str, const string& speed_str);
 
-    static map<string, enum Org> org_map;
-    static map<string, enum Speed> speed_map;
+    static map<string, Org> org_map;
+    static map<string, Speed> speed_map;
 
 
     // REFSB and REF is not compatible, choose one or the other.
@@ -131,27 +131,27 @@ public:
 
     /* State */
     State start[int(Level::MAX)] = {
-        State::MAX, State::PowerUp, State::MAX, State::Closed, State::Closed, State::MAX
+        State::MAX, State::PowerUp, State::Closed, State::Closed, State::MAX
     };
 
     /* Translate */
-    Command translate[int(Request::Type::MAX)] = {
+    Command translate[int(RamRequest::Type::MAX)] = {
         Command::RD,  Command::WR,
         Command::REF, Command::PDE, Command::SRE
     };
 
     /* Prereq */
-    function<Command(DRAM*, Command cmd, int)> prereq[int(Level::MAX)][int(Command::MAX)];
+    function<Command(RamDRAM*, Command cmd, int)> prereq[int(Level::MAX)][int(Command::MAX)];
 
     // SAUGATA: added function object container for row hit status
     /* Row hit */
-    function<bool(DRAM*, Command cmd, int)> rowhit[int(Level::MAX)][int(Command::MAX)];
-    function<bool(DRAM*, Command cmd, int)> rowopen[int(Level::MAX)][int(Command::MAX)];
+    function<bool(RamDRAM*, Command cmd, int)> rowhit[int(Level::MAX)][int(Command::MAX)];
+    function<bool(RamDRAM*, Command cmd, int)> rowopen[int(Level::MAX)][int(Command::MAX)];
 
     vector<TimingEntry> timing[int(Level::MAX)][int(Command::MAX)];
 
     /* Lambda */
-    function<void(DRAM*, int)> lambda[int(Level::MAX)][int(Command::MAX)];
+    function<void(RamDRAM*, int)> lambda[int(Level::MAX)][int(Command::MAX)];
 
 
     struct OrgEntry {
@@ -159,9 +159,9 @@ public:
         int dq;
         int count[int(Level::MAX)];
     } org_table[int(Org::MAX)] = {
-        {1<<10, 128, {0, 0, 4, 2, 1<<13, 1<<(6+1)}},
-        {2<<10, 128, {0, 0, 4, 2, 1<<14, 1<<(6+1)}},
-        {4<<10, 128, {0, 0, 4, 4, 1<<14, 1<<(6+1)}},
+        {1<<10, 128, {0, 0, 2, 1<<13, 1<<(6+1)}},
+        {2<<10, 128, {0, 0, 2, 1<<14, 1<<(6+1)}},
+        {4<<10, 128, {0, 0, 2, 1<<11, 1<<(12+1)}},
     }, org_entry;
 
     void set_channel_number(int channel);

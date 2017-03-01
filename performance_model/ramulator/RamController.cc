@@ -1,13 +1,13 @@
-#include "Controller.h"
+#include "RamController.h"
 
 using namespace ramulator;
 
 namespace ramulator
 {
 
-	Controller::Controller(const RamConfig& configs, DRAM* channel) :
+	RamController::RamController(const RamConfig& configs, RamDRAM* channel) :
         channel(channel),
-        scheduler(new Scheduler(this)),
+        scheduler(new RamScheduler(this)),
         rowpolicy(new RowPolicy(this)),
         rowtable(new RowTable(this)),
         refresh(new Refresh(this)),
@@ -80,6 +80,57 @@ namespace ramulator
             .desc("Number of row conflicts for write requests per channel per core")
             .precision(0)
             ;
+		/* Bank Stats*/
+		bank_reads
+			.init(configs.get_ranks() * 2)
+			.name("read_channel_" + to_string(channel->id) + "_core")
+			.desc("Number of reads for read requests per bank per channel per core")
+			.precision(0)
+			;
+		bank_writes
+			.init(configs.get_ranks() * 2)
+			.name("write_channel_" + to_string(channel->id) + "_core")
+			.desc("Number of writes for read requests per bank per channel per core")
+			.precision(0)
+			;
+		bank_read_row_hits
+			.init(configs.get_ranks() * 2)
+			.name("read_row_hits_channel_" + to_string(channel->id) + "_core")
+			.desc("Number of row hits for read requests per bank per channel per core")
+			.precision(0)
+			;
+		bank_read_row_misses
+			.init(configs.get_ranks() * 2)
+			.name("read_row_misses_channel_" + to_string(channel->id) + "_core")
+			.desc("Number of row misses for read requests per bank per channel per core")
+			.precision(0)
+			;
+		bank_read_row_conflicts
+			.init(configs.get_ranks() * 2)
+			.name("read_row_conflicts_channel_" + to_string(channel->id) + "_core")
+			.desc("Number of row conflicts for read requests per bank per channel per core")
+			.precision(0)
+			;
+
+		bank_write_row_hits
+			.init(configs.get_ranks() * 2)
+			.name("write_row_hits_channel_" + to_string(channel->id) + "_core")
+			.desc("Number of row hits for write requests per bank per channel per core")
+			.precision(0)
+			;
+		bank_write_row_misses
+			.init(configs.get_ranks() * 2)
+			.name("write_row_misses_channel_" + to_string(channel->id) + "_core")
+			.desc("Number of row misses for write requests per bank per channel per core")
+			.precision(0)
+			;
+		bank_write_row_conflicts
+			.init(configs.get_ranks() * 2)
+			.name("write_row_conflicts_channel_" + to_string(channel->id) + "_core")
+			.desc("Number of row conflicts for write requests per bank per channel per core")
+			.precision(0)
+			;
+		/* End of Bank Stats*/
 
         read_transaction_bytes
             .name("read_transaction_bytes_"+to_string(channel->id))
@@ -137,7 +188,7 @@ namespace ramulator
             ;
 
     }
-	Controller::~Controller() {
+	RamController::~RamController() {
         delete scheduler;
         delete rowpolicy;
         delete rowtable;
@@ -148,7 +199,7 @@ namespace ramulator
         cmd_trace_files.clear();
     }
 
-    void Controller::tick()
+    void RamController::tick()
     {
         clk++;
         req_queue_length_sum += readq.size() + writeq.size() + pending.size();
@@ -157,7 +208,7 @@ namespace ramulator
 
         /*** 1. Serve completed reads ***/
         if (pending.size()) {
-            Request& req = pending[0];
+            RamRequest& req = pending[0];
             if (req.depart <= clk) {
                 if (req.depart - req.arrive > 1) { // this request really accessed a row
                   read_latency_sum += req.depart - req.arrive;
@@ -199,15 +250,26 @@ namespace ramulator
             }
             return;  // nothing more to be done this cycle
         }
+		// ZMAC_ADDED: bank stats
+		int bank_i = req->addr_vec[int(Level::Rank)] * 2 + req->addr_vec[int(Level::Bank)];
+		if (req->type == RamRequest::Type::READ) {
+			// ZMAC_ADDED: bank stats
+			++bank_reads[bank_i];
+		}
+		else if (req->type == RamRequest::Type::WRITE) {
+			// ZMAC_ADDED: bank stats
+			++bank_writes[bank_i];
+		}
 
         if (req->is_first_command) {
             req->is_first_command = false;
             int coreid = req->coreid;
-            if (req->type == Request::Type::READ || req->type == Request::Type::WRITE) {
+            if (req->type == RamRequest::Type::READ || req->type == RamRequest::Type::WRITE) {
               channel->update_serving_requests(req->addr_vec.data(), 1, clk);
             }
             int tx = (channel->spec->prefetch_size * channel->spec->channel_width / 8);
-            if (req->type == Request::Type::READ) {
+			
+            if (req->type == RamRequest::Type::READ) {
                 if (is_row_hit(req)) {
                     ++read_row_hits[coreid];
                     ++row_hits;
@@ -219,19 +281,19 @@ namespace ramulator
                     ++row_misses;
                 }
               read_transaction_bytes += tx;
-            } else if (req->type == Request::Type::WRITE) {
-              if (is_row_hit(req)) {
-                  ++write_row_hits[coreid];
-                  ++row_hits;
-              } else if (is_row_open(req)) {
-                  ++write_row_conflicts[coreid];
-                  ++row_conflicts;
-              } else {
-                  ++write_row_misses[coreid];
-                  ++row_misses;
-              }
-              write_transaction_bytes += tx;
-            }
+            } else if (req->type == RamRequest::Type::WRITE) {
+				if (is_row_hit(req)) {
+					++write_row_hits[coreid];
+					++row_hits;
+				} else if (is_row_open(req)) {
+					++write_row_conflicts[coreid];
+					++row_conflicts;
+				} else {
+					++write_row_misses[coreid];
+					++row_misses;
+				}
+				write_transaction_bytes += tx;
+			}
         }
 
         // issue command on behalf of request
@@ -243,12 +305,12 @@ namespace ramulator
             return;
 
         // set a future completion time for read requests
-        if (req->type == Request::Type::READ) {
+        if (req->type == RamRequest::Type::READ) {
             req->depart = clk + channel->spec->read_latency;
             pending.push_back(*req);
         }
 
-        if (req->type == Request::Type::WRITE) {
+        if (req->type == RamRequest::Type::WRITE) {
             channel->update_serving_requests(req->addr_vec.data(), -1, clk);
         }
 
@@ -256,7 +318,7 @@ namespace ramulator
         queue->q.erase(req);
     }
 
-    void Controller::issue_cmd(Command cmd, const vector<int>& addr_vec)
+    void RamController::issue_cmd(Command cmd, const vector<int>& addr_vec)
     {
         assert(is_ready(cmd, addr_vec));
         channel->update(cmd, addr_vec.data(), clk);

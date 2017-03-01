@@ -1,9 +1,9 @@
-#ifndef __SCHEDULER_H
-#define __SCHEDULER_H
+#ifndef __RAM_SCHEDULER_H
+#define __RAM_SCHEDULER_H
 
-#include "DRAM.h"
-#include "Request.h"
-#include "Controller.h"
+#include "RamDRAM.h"
+#include "RamRequest.h"
+#include "RamController.h"
 #include <vector>
 #include <map>
 #include <list>
@@ -17,12 +17,12 @@ using namespace std;
 namespace ramulator
 {
 
-class Controller;
+class RamController;
 
-class Scheduler
+class RamScheduler
 {
 public:
-    Controller* ctrl;
+    RamController* ctrl;
 
     enum class Type {
         FCFS, FRFCFS, FRFCFS_Cap, FRFCFS_PriorHit, MAX
@@ -30,12 +30,12 @@ public:
 
     long cap = 16;
 
-    Scheduler(Controller* ctrl);
+    RamScheduler(RamController* ctrl);
 
-    list<Request>::iterator get_head(list<Request>& q);
+    list<RamRequest>::iterator get_head(list<RamRequest>& q);
 
 private:
-    typedef list<Request>::iterator ReqIter;
+    typedef list<RamRequest>::iterator ReqIter;
     function<ReqIter(ReqIter, ReqIter)> compare[int(Type::MAX)];
 };
 
@@ -43,7 +43,7 @@ private:
 class RowPolicy
 {
 public:
-    Controller* ctrl;
+    RamController* ctrl;
 
     enum class Type {
         Closed, Opened, Timeout, MAX
@@ -51,7 +51,7 @@ public:
 
     int timeout = 50;
 
-    RowPolicy(Controller* ctrl);
+    RowPolicy(RamController* ctrl);
 
     vector<int> get_victim(Command cmd)
     {
@@ -66,7 +66,7 @@ private:
 class RowTable
 {
 public:
-    Controller* ctrl;
+    RamController* ctrl;
 
     struct Entry {
         int row;
@@ -76,7 +76,7 @@ public:
 
     map<vector<int>, Entry> table;
 
-    RowTable(Controller* ctrl);
+    RowTable(RamController* ctrl);
 
     void update(Command cmd, const vector<int>& addr_vec, long clk);
     

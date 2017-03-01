@@ -1,8 +1,8 @@
-#include "DRAM.h"
+#include "RamDRAM.h"
 
 namespace ramulator {
 // register statistics
-void DRAM::regStats(const std::string& identifier) {
+void RamDRAM::regStats(const std::string& identifier) {
     active_cycles
         .name("active_cycles" + identifier + "_" + to_string(id))
         .desc("Total active cycles for level " + identifier + "_" + to_string(id))
@@ -35,6 +35,16 @@ void DRAM::regStats(const std::string& identifier) {
         .desc("The average of read and write requests that are served in this DRAM element per memory cycle for level " + identifier + "_" + to_string(id))
         .precision(6)
         ;
+	serving_reads
+		.name("serving_reads" + identifier + "_" + to_string(id))
+		.desc("The sum of read requests at this DRAM part")
+		.precision(0)
+		;
+	serving_writes
+		.name("serving_writes" + identifier + "_" + to_string(id))
+		.desc("The sum of write requests at this DRAM part")
+		.precision(0)
+		;
 
     if (!children.size()) {
       return;
@@ -46,7 +56,7 @@ void DRAM::regStats(const std::string& identifier) {
     }
 }
 
-void DRAM::finish(long dram_cycles) {
+void RamDRAM::finish(long dram_cycles) {
   // finalize busy cycles
   busy_cycles = active_cycles.value() + refresh_cycles.value() - active_refresh_overlap_cycles.value();
 
@@ -63,7 +73,7 @@ void DRAM::finish(long dram_cycles) {
 }
 
 // Constructor
-DRAM::DRAM(HBM* spec, Level level) :
+RamDRAM::RamDRAM(HBM* spec, Level level) :
     spec(spec), level(level), id(0), parent(NULL)
 {
 
@@ -95,7 +105,7 @@ DRAM::DRAM(HBM* spec, Level level) :
 
     // recursively construct my children
     for (int i = 0; i < child_max; i++) {
-        DRAM* child = new DRAM(spec, Level(child_level));
+        RamDRAM* child = new RamDRAM(spec, Level(child_level));
         child->parent = this;
         child->id = i;
         children.push_back(child);
@@ -103,14 +113,14 @@ DRAM::DRAM(HBM* spec, Level level) :
 
 }
 
-DRAM::~DRAM()
+RamDRAM::~RamDRAM()
 {
     for (auto child: children)
         delete child;
 }
 
 // Insert
-void DRAM::insert(DRAM* child)
+void RamDRAM::insert(RamDRAM* child)
 {
     child->parent = this;
     child->id = children.size();
@@ -118,7 +128,7 @@ void DRAM::insert(DRAM* child)
 }
 
 // Decode
-Command DRAM::decode(Command cmd, const int* addr)
+Command RamDRAM::decode(Command cmd, const int* addr)
 {
     int child_id = addr[int(level)+1];
     if (prereq[int(cmd)]) {
@@ -136,7 +146,7 @@ Command DRAM::decode(Command cmd, const int* addr)
 
 
 // Check
-bool DRAM::check(Command cmd, const int* addr, long clk)
+bool RamDRAM::check(Command cmd, const int* addr, long clk)
 {
     if (next[int(cmd)] != -1 && clk < next[int(cmd)])
         return false; // stop recursion: the check failed at this level
@@ -151,7 +161,7 @@ bool DRAM::check(Command cmd, const int* addr, long clk)
 
 // SAUGATA: added function to check whether a command is a row hit
 // Check row hits
-bool DRAM::check_row_hit(Command cmd, const int* addr)
+bool RamDRAM::check_row_hit(Command cmd, const int* addr)
 {
     int child_id = addr[int(level)+1];
     if (rowhit[int(cmd)]) {
@@ -165,7 +175,7 @@ bool DRAM::check_row_hit(Command cmd, const int* addr)
     return children[child_id]->check_row_hit(cmd, addr);
 }
 
-bool DRAM::check_row_open(Command cmd, const int* addr)
+bool RamDRAM::check_row_open(Command cmd, const int* addr)
 {
     int child_id = addr[int(level)+1];
     if (rowopen[int(cmd)]) {
@@ -179,7 +189,7 @@ bool DRAM::check_row_open(Command cmd, const int* addr)
     return children[child_id]->check_row_open(cmd, addr);
 }
 
-long DRAM::get_next(Command cmd, const int* addr)
+long RamDRAM::get_next(Command cmd, const int* addr)
 {
     long next_clk = max(cur_clk, next[int(cmd)]);
     auto node = this;
@@ -191,16 +201,23 @@ long DRAM::get_next(Command cmd, const int* addr)
 }
 
 // Update
-void DRAM::update(Command cmd, const int* addr, long clk)
+void RamDRAM::update(Command cmd, const int* addr, long clk)
 {
     cur_clk = clk;
     update_state(cmd, addr);
     update_timing(cmd, addr, clk);
+
+	if (cmd == Command::RD || cmd == Command::RDA) {
+		serving_reads++;
+	}
+	if (cmd == Command::WR || cmd == Command::WRA) {
+		serving_writes++;
+	}
 }
 
 
 // Update (State)
-void DRAM::update_state(Command cmd, const int* addr)
+void RamDRAM::update_state(Command cmd, const int* addr)
 {
     int child_id = addr[int(level)+1];
     if (lambda[int(cmd)])
@@ -215,7 +232,7 @@ void DRAM::update_state(Command cmd, const int* addr)
 
 
 // Update (Timing)
-void DRAM::update_timing(Command cmd, const int* addr, long clk)
+void RamDRAM::update_timing(Command cmd, const int* addr, long clk)
 {
     // I am not a target node: I am merely one of its siblings
     if (id != addr[int(level)]) {
@@ -271,7 +288,7 @@ void DRAM::update_timing(Command cmd, const int* addr, long clk)
 
 }
 
-void DRAM::update_serving_requests(const int* addr, int delta, long clk) {
+void RamDRAM::update_serving_requests(const int* addr, int delta, long clk) {
   assert(id == addr[int(level)]);
   assert(delta == 1 || delta == -1);
   // update total serving requests

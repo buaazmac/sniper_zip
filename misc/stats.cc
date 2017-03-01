@@ -158,6 +158,9 @@ StatsManager::init()
    hotspot->getNames("./HotSpot/powertrace.input", unit_names, &unit_num);
    /*Initial DRAM bank statistics*/
    for (int i = 0; i < 32; i++) {
+	   vault_reads[i] = 0;
+	   vault_writes[i] = 0;
+	   vault_row_hits[i] = 0;
 	   for (int j =0; j < 8; j++) {
 		   bank_stats[i][j].tACT = SubsecondTime::Zero();
 		   bank_stats[i][j].tPRE = SubsecondTime::Zero();
@@ -441,8 +444,14 @@ StatsManager::dumpHotspotInput()
 			VaultPerfModel* vault = m_stacked_dram_unison->m_vaults_array[i];
 			n_banks = vault->n_banks;
 
-			UInt32 tot_reads, tot_writes;
-			tot_reads = tot_writes = 0;
+			UInt32 tot_reads, tot_writes, tot_row_hits;
+			tot_reads = vault->stats.reads - vault_reads[i];
+			tot_writes = vault->stats.writes - vault_writes[i];
+			tot_row_hits = vault->stats.row_hits - vault_row_hits[i];
+			// Update Vault Stats
+			vault_reads[i] = vault->stats.reads;
+			vault_writes[i] = vault->stats.writes;
+			vault_row_hits[i] = vault->stats.row_hits;
 
 			for (UInt32 j = 0; j < vault->n_banks; j++) {
 				BankPerfModel* bank = vault->m_banks_array[j];
@@ -463,13 +472,13 @@ StatsManager::dumpHotspotInput()
 				BankStatEntry *tmp = &bank_stats_interval[i][j];
 
 				double page_hit_rate = 0.5;
-				if (tmp->reads + tmp->writes != 0) {
-					page_hit_rate = double(tmp->row_hits) / double(tmp->reads + tmp->writes);
+				if (tot_reads + tot_writes != 0) {
+					page_hit_rate = double(tot_row_hits) / double(tot_reads + tot_writes);
 				}
 				bank_power[i][j] = computeDramPower(tmp->tACT, tmp->tPRE, tmp->tRD, tmp->tWR, tot_time, page_hit_rate);
 
-				tot_reads += tmp->reads;
-				tot_writes += tmp->writes;
+				//tot_reads += tmp->reads;
+				//tot_writes += tmp->writes;
 			}
 			vault_power[i] = computeDramCntlrPower(tot_reads, tot_writes, tot_time);
 			vault_access[i] = tot_reads + tot_writes;
@@ -499,6 +508,24 @@ StatsManager::dumpHotspotInput()
 		}
 	}
 	pt_file << std::endl;
+
+/*
+   Here we can choose to measure the results of 2.5D model
+   In which, we turn off the power of CPU components
+ */
+#define __ONLY_DRAM__
+#ifdef __ONLY_DRAM__
+	power_L3 = 0;
+	for (int i = 0; i < 4; i++) {
+		power_exe[i] = 0;
+		power_ifetch[i] = 0;
+		power_lsu[i] = 0;
+		power_mmu[i] = 0;
+		power_l2[i] = 0;
+		power_ru[i] = 0;
+	}
+#endif
+
 
 	for (int pt = 0; pt < 2; pt ++) {
 		pt_file << power_L3;

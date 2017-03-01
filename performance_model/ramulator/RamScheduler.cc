@@ -1,7 +1,7 @@
-#include "Scheduler.h"
+#include "RamScheduler.h"
 namespace ramulator {
 
-Scheduler::Scheduler(Controller* ctrl) : ctrl(ctrl) {
+RamScheduler::RamScheduler(RamController* ctrl) : ctrl(ctrl) {
     // FCFS
     compare[0] = [this] (ReqIter req1, ReqIter req2) {
             if (req1->arrive <= req2->arrive) return req1;
@@ -49,7 +49,7 @@ Scheduler::Scheduler(Controller* ctrl) : ctrl(ctrl) {
             return req2;};
 }
 
-    list<Request>::iterator Scheduler::get_head(list<Request>& q)
+    list<RamRequest>::iterator RamScheduler::get_head(list<RamRequest>& q)
     {
       // TODO make the decision at compile time
       if (type != Type::FRFCFS_PriorHit) {
@@ -120,7 +120,7 @@ Scheduler::Scheduler(Controller* ctrl) : ctrl(ctrl) {
       }
     }
 
-RowPolicy::RowPolicy(Controller* ctrl) : ctrl(ctrl) {
+RowPolicy::RowPolicy(RamController* ctrl) : ctrl(ctrl) {
     // Closed
     policy[0] = [this] (Command cmd) -> vector<int> {
             for (auto& kv : this->ctrl->rowtable->table) {
@@ -147,7 +147,7 @@ RowPolicy::RowPolicy(Controller* ctrl) : ctrl(ctrl) {
             return vector<int>();};
 }
 
-RowTable::RowTable(Controller* ctrl) : ctrl(ctrl) {
+RowTable::RowTable(RamController* ctrl) : ctrl(ctrl) {
 }
 
     void RowTable::update(Command cmd, const vector<int>& addr_vec, long clk)

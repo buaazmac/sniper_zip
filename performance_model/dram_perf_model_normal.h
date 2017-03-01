@@ -22,8 +22,6 @@
 #include <iostream>
 #include <fstream>
 
-#include "ramulator/dram_sim.h"
-
 class DramCachePageInfo
 {
 	public:
@@ -149,14 +147,16 @@ class StackDramCacheCntlrUnison
 		UInt32 m_bank_size;
 		UInt32 m_row_size;
 
+		UInt32 page_misses, block_misses;
+		UInt32 wb_blocks;
+
 		//log file
 		std::ofstream log_file;
 
 		//Performance model
 		StackedDramPerfUnison* m_dram_perf_model;
+		bool remap_invalid;
 		
-		//Dram Model (ramulator)
-		DramModel* m_dram_model;
 
 		StackDramCacheCntlrUnison(UInt32 set_num, UInt32 associativity, UInt32 blocksize, UInt32 pagesize);
 		~StackDramCacheCntlrUnison();

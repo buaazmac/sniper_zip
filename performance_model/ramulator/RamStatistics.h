@@ -1,9 +1,9 @@
-#ifndef __STATISTICS_H
-#define __STATISTICS_H
+#ifndef __RAM_STATISTICS_H
+#define __RAM_STATISTICS_H
 
 #include <string>
 
-#include "StatType.h"
+#include "RamStatType.h"
 
 /*
   IMPORTANT NOTE - Read this first!
