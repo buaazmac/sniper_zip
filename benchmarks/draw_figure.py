@@ -40,7 +40,7 @@ with open(sys.argv[3]) as f:
 				flag = 1
 				continue
 			tot_access = reduce(lambda x,y: x+y, dram_cntlr_access)
-			if tot_access > 50000:
+			if tot_access > 5000:
 				temp_trace.append(dram_cntlr_temp)
 				access_trace.append(dram_cntlr_access)
 				missrate_trace.append(cache_miss_rate)

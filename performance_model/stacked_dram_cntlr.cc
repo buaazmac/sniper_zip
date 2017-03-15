@@ -454,6 +454,9 @@ StackedDramPerfUnison::updateStats()
 			bank->stats.tRD = SubsecondTime::NS(m_dram_model->getBankRdTime(i, j));
 			bank->stats.tWR = SubsecondTime::NS(m_dram_model->getBankWrTime(i, j));
 
+			bank->stats.reads = m_dram_model->getBankReads(i, j);
+			bank->stats.writes = m_dram_model->getBankWrites(i, j);
+
 			tot_act_t += bank->stats.tACT;
 			tot_pre_t += bank->stats.tPRE;
 			tot_rd_t += bank->stats.tRD;

@@ -182,7 +182,7 @@ uint64_t DramModel::getBankRdTime(int vault, int bank)
 	uint64_t writes = memory->ctrls[vault]->bank_writes[bank].value();
 	uint64_t act_t = getBankActTime(vault, bank);
 	double read_ratio = 0;
-	if (reads+writes != 0) 
+	if (reads + writes != 0) 
 		read_ratio = double(reads) / double(reads + writes);
 	uint64_t rst = act_t * read_ratio;
 	//cout << "@@@RANK_READ@@@" << rank << ", reads: " << reads << ", writes: " << writes << ", rst: " << rst << endl;
@@ -203,3 +203,11 @@ uint64_t DramModel::getBankWrTime(int vault, int bank)
 	return rst;
 }
 
+uint32_t DramModel::getBankReads(int vault, int bank)
+{
+	return uint32_t(memory->ctrls[vault]->bank_reads[bank].value());
+}
+uint32_t DramModel::getBankWrites(int vault, int bank)
+{
+	return uint32_t(memory->ctrls[vault]->bank_writes[bank].value());
+}

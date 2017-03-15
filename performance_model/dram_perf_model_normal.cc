@@ -357,6 +357,7 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 	IntPtr page_offset;
 	UInt64 pc = 0;
 	UInt32 footprint = 0;
+
 	/* Here we need to translate virtual address to physical adress
 TODO:
 	 * We can use a map, to map virtual page to phsical page
@@ -552,17 +553,19 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time)
 IntPtr
 StackDramCacheCntlrUnison::translateAddress(IntPtr address)
 {
-	IntPtr offset = address & ((1 << 11) - 1);
-	IntPtr tag = 0;
+	IntPtr offset = address & ((1 << 12) - 1);
+	IntPtr v_tag = address >> 12;
+	IntPtr p_tag = v_tag;
 	
-	if (page_table.find(address) != page_table.end()) {
-		tag = page_table[address];
+	if (page_table.find(v_tag) != page_table.end()) {
+		p_tag = page_table[v_tag];
+		//std::cout << "find a tag!" << std::endl;
 	} else {
-		tag = avail_phy_page_tag;
-		page_table[address] = avail_phy_page_tag;
+		page_table[v_tag] = avail_phy_page_tag;
+		p_tag = avail_phy_page_tag;
 	}
 	avail_phy_page_tag ++;
-	return ((tag << 11) | offset);
+	return ((p_tag << 12) | offset);
 }
 
 bool

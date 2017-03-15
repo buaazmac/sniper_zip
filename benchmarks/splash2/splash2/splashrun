@@ -199,7 +199,8 @@ if __name__ == '__main__':
     mkNewDir(rundir_)
     os.chdir(rundir_)
     os.system('cp -R ' + runsniper_dir + '/HotSpot ' + rundir_)
-    print 'Copy Hotspot configuration from ' + runsniper_dir + 'to ' + rundir_
+    os.system('cp -R ' + runsniper_dir + '/ramulator ' + rundir_)
+    print 'Copy Hotspot & Ramulator configuration from ' + runsniper_dir + 'to ' + rundir_
     try:
       args = bm.prepare(inputsize, nthreads, rundir_)
     except UnsupportedParameter, e:

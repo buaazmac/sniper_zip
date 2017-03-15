@@ -63,6 +63,9 @@ public:
 
 	uint64_t getBankWrTime(int vault, int bank);
 
+	uint32_t getBankReads(int vault, int bank);
+	uint32_t getBankWrites(int vault, int bank);
+
 };
 
 #endif
