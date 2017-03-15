@@ -204,9 +204,21 @@ StatsManager::recordMetricName(UInt64 keyId, std::string objectName, std::string
 }
 
 double 
-StatsManager::computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, SubsecondTime tRD, SubsecondTime tWR, SubsecondTime totT, double page_hit_rate)
+StatsManager::computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, SubsecondTime tRD, SubsecondTime tWR, SubsecondTime totT, UInt32 reads, UInt32 writes, double page_hit_rate)
 {
 	double act_t = double(tACT.getFS()), pre_t = double(tPRE.getFS()), read_t = double(tRD.getFS()), write_t = double(tWR.getFS()), tot_time = double(totT.getFS());
+	if (act_t > tot_time) {
+		std::cout << "[Potetial Error] tACT > tTOT\n";
+		act_t = tot_time;
+	}
+	double read_ratio = 0,
+		   write_ratio = 0;
+	if (reads + writes != 0) {
+		read_ratio = double(reads) / double(reads + writes);
+		write_ratio = double(writes) / double(reads + writes);
+	}
+	read_t = read_ratio * act_t;
+	write_t = write_ratio * act_t;
     /*set some default value*/
 	int ck_freq = 800;
     double bnk_pre = 1;
@@ -215,11 +227,11 @@ StatsManager::computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, Subsecond
     double wr_sch = 0.01;
     double rd_sch = 0.01;
     int rd_per = 50;
-	if (read_t + write_t != 0)
-		rd_per = (100 * read_t) / (read_t + write_t);
+	if (reads + writes != 0)
+		rd_per = (100 * reads) / (reads + write_t);
 
 	/*set the real value*/
-	bnk_pre = double((tot_time - write_t - read_t) / tot_time);
+	bnk_pre = double((tot_time - act_t) / tot_time);
 	cke_lo_pre = 0.3;
 	cke_lo_act = 0.3;
 	wr_sch = write_t / tot_time;
@@ -416,6 +428,7 @@ StatsManager::updateBankStat(int i, int j, BankPerfModel* bank)
 void
 StatsManager::dumpHotspotInput()
 {
+	std::cout << "[STAT_DEBUG] Begin Dumping HotspotInput\n" << std::endl;
 	/* Here we dump input for hotspot
 	 * init_file(tmp.steady) from last time
 	 * -p powertrace.input
@@ -438,7 +451,12 @@ StatsManager::dumpHotspotInput()
 	UInt32 n_banks = 8;
 	UInt32 n_vaults = m_stacked_dram_unison->n_vaults;
 
+	//std::ofstream test_file;
+	//test_file.open("./runtime_data.txt", std::ofstream::out | std::ofstream::app);
+
    if (m_stacked_dram_unison != NULL) {
+
+	   //test_file << "-----------OUTPUT_DATA-----------------" << std::endl;
 
 		for (UInt32 i = 0; i < m_stacked_dram_unison->n_vaults; i++) {
 			VaultPerfModel* vault = m_stacked_dram_unison->m_vaults_array[i];
@@ -458,11 +476,12 @@ StatsManager::dumpHotspotInput()
 				bank_stats_interval[i][j] = bank->stats;
 				bank_stats_interval[i][j].tACT -= bank_stats[i][j].tACT;
 				bank_stats_interval[i][j].tPRE -= bank_stats[i][j].tPRE;
-				bank_stats_interval[i][j].tRD -= bank_stats[i][j].tRD;
-				bank_stats_interval[i][j].tWR -= bank_stats[i][j].tWR;
 				bank_stats_interval[i][j].reads -= bank_stats[i][j].reads;
 				bank_stats_interval[i][j].writes -= bank_stats[i][j].writes;
 				bank_stats_interval[i][j].row_hits -= bank_stats[i][j].row_hits;
+
+				bank_stats_interval[i][j].tRD = SubsecondTime::Zero();
+				bank_stats_interval[i][j].tWR = SubsecondTime::Zero();
 
 				//printf("#####init: %d, interval: %d, total: %d\n", bank->stats.reads, bank_stats_interval[i][j].reads, bank_stats[i][j].reads);
 
@@ -475,16 +494,35 @@ StatsManager::dumpHotspotInput()
 				if (tot_reads + tot_writes != 0) {
 					page_hit_rate = double(tot_row_hits) / double(tot_reads + tot_writes);
 				}
-				bank_power[i][j] = computeDramPower(tmp->tACT, tmp->tPRE, tmp->tRD, tmp->tWR, tot_time, page_hit_rate);
+				bank_power[i][j] = computeDramPower(tmp->tACT, tmp->tPRE, tmp->tRD, tmp->tWR, tot_time, tmp->reads, tmp->writes, page_hit_rate);
 
+				/*
+				test_file << "bank_" << i << "_" << j
+						  << ": power: " << bank_power[i][j]
+						  << ", reads: " << tmp->reads
+						  << ", writes: " << tmp->writes
+						  << ", t_act: " << tmp->tACT.getUS()
+						  << ", t_pre: " << tmp->tPRE.getUS()
+						  << ", t_rd: " << tmp->tRD.getUS()
+						  << ", t_wr: " << tmp->tWR.getUS()
+						  << ", t_tot: " << tot_time.getUS()
+						  << ", page_hit: " << page_hit_rate
+						  <<std::endl;
+				*/
 				//tot_reads += tmp->reads;
 				//tot_writes += tmp->writes;
 			}
 			vault_power[i] = computeDramCntlrPower(tot_reads, tot_writes, tot_time);
 			vault_access[i] = tot_reads + tot_writes;
-			//pt_file << "\t" << vault_power[i];
+
+			/*
+			test_file << "---------------------------" << std::endl;
+			test_file << "vault_" << i 
+				<< ": power: " << vault_power[i]
+				<< ", reads: " << tot_reads
+				<< ", writes: " << tot_writes << std::endl;
+			*/
 		}
-		//pt_file << std::endl;
    }
 
 /* Write down power trace*/
@@ -547,11 +585,14 @@ StatsManager::dumpHotspotInput()
 	}
 
 	pt_file.close();
+	//test_file.close();
+	std::cout << "[STAT_DEBUG] End Dumping HotspotInput" << std::endl;
 }
 
 void
 StatsManager::callHotSpot()
 {
+	std::cout << "[STAT_DEBUG] Begin Calling HotSpot" << std::endl;
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 	char *argv[15];
 	/*First run to get steady states*/
@@ -587,6 +628,7 @@ StatsManager::callHotSpot()
   	argv[14] = "./HotSpot/test_3D.lcf";
 
   	hotspot->calculateTemperature(unit_temp, 15, argv);
+
 	/*Debug for temperature*/
 	double max_temp, max_cntlr_temp, max_bank_temp;
 	max_temp = max_cntlr_temp = max_bank_temp = 0;
@@ -643,10 +685,11 @@ StatsManager::callHotSpot()
 				   << " CurrentTIme: " << cur_time_ms << std::endl;
 	m_stacked_dram_unison->clearCacheStats();
 
+	std::cout << "[STAT_DEBUG] End Calling HotSpot" << std::endl;
 	printf("---------------\n");
-	printf("%s: %.5f, %s: %.5f, %s: %.5f\n", s1, max_temp, 
-											 s2, max_cntlr_temp,
-											 s3, max_bank_temp);
+	//printf("%s: %.5f, %s: %.5f, %s: %.5f\n", s1, max_temp, 
+	//										 s2, max_cntlr_temp,
+	//										 s3, max_bank_temp);
 	printf("-----------------------\n");
 }
 

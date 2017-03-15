@@ -172,7 +172,7 @@ class StatsManager
 		  double dimms_per_socket;
 	  } dram_cntlr_table = {800.0, 0.678, 0.825, 1.0, 8.0, 4.0};
 
-	  double computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, SubsecondTime tRD, SubsecondTime tWR, SubsecondTime totT, double page_hit_rate);
+	  double computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, SubsecondTime tRD, SubsecondTime tWR, SubsecondTime totT, UInt32 reads, UInt32 writes, double page_hit_rate);
 	  double computeDramCntlrPower(UInt32 reads, UInt32 writes, SubsecondTime t);
 
 
