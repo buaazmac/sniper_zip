@@ -19,6 +19,8 @@
 #include <iostream>
 #include <fstream>
 
+#define INVALID_TARGET 999
+
 class StackedDramPerfUnison;
 
 class RemappingTable {
@@ -32,24 +34,25 @@ class RemappingTable {
 	*/
 public:
 	struct remapping_entry {
-		int phy, log;
+		UInt32 phy, log;
 		bool valid, migrated;
 	};
-	int n_vaults, n_banks;
-	int n_entries;
+	UInt32 n_vaults, n_banks;
+	UInt32 n_entries;
 	struct remapping_entry* m_table;
-	RemappingTable(int vaults, int banks);
+	RemappingTable(UInt32 vaults, UInt32 banks);
 	~RemappingTable();
 
-	void remapBankTo(int src, int des, bool invalid);
-	void remapVaultTo(int src, int des, bool invalid);
+	void remapBankTo(UInt32 src, UInt32 des, bool invalid);
+	void remapVaultTo(UInt32 src, UInt32 des, bool invalid);
 
-	int setValid(int idx, bool valid) {m_table[idx].valid = valid;}
-	int setMigrated(int idx, bool migrated) {m_table[idx].migrated = migrated;}
+	void setValid(UInt32 idx, bool valid) {m_table[idx].valid = valid;}
+	void setMigrated(UInt32 idx, bool migrated) {m_table[idx].migrated = migrated;}
 
-	int getPhyIdx(int idx);
-	int getLogIdx(int idx);
-	bool getValid(int idx);
+	UInt32 getPhyIdx(UInt32 idx);
+	UInt32 getLogIdx(UInt32 idx);
+	bool getValid(UInt32 idx);
+	bool getMigrated(UInt32 idx);
 };
 
 class StatStoreUnit {
@@ -64,46 +67,50 @@ class StatStoreUnit {
 	*/
 public:
 	struct stats_entry {
-		int idx, access_count, data_cov, temperature, cntlr_temp;
-		bool too_hot, valid, just_swapped;
+		UInt32 idx, access_count, data_cov, temperature, cntlr_temp;
+		bool too_hot, valid, just_remapped;
 	};
-	int n_vaults, n_banks;
-	const int temperature_threshold = 90;
-	const int bank_access_threshold = 2000;
-	const int vault_access_threshold = 3000;
-	int n_entries;
+	UInt32 n_vaults, n_banks;
+	const UInt32 temperature_threshold = 90;
+	const UInt32 bank_access_threshold = 2000;
+	const UInt32 vault_access_threshold = 3000;
+	UInt32 n_entries;
 	struct stats_entry* m_table;
-	StatStoreUnit(int vaults, int banks);
+	StatStoreUnit(UInt32 vaults, UInt32 banks);
 	~StatStoreUnit();
 
-	void clear(int idx);
-	void swap(int x, int y);
-	void setAccess(int idx, int x) {m_table[idx].access_count = x;}
-	void setDataCov(int idx, int x) {m_table[idx].data_cov = x;}
-	void setTemp(int idx, int x);
-	void setControllerTemp(int v, int);
-	int getAccess(int idx);
-	int getDataCov(int idx);
-	int getTemp(int idx);
-	bool isTooHot(int idx);
-	bool isTooFreq(int idx);
-	bool isJustRemapped(int idx);
+	void clear(UInt32 idx);
+	void swap(UInt32 x, UInt32 y);
+	void remapBank(UInt32 src, UInt32 des);
+	void remapVault(UInt32 src, UInt32 des);
+	void setAccess(UInt32 idx, UInt32 x) {m_table[idx].access_count = x;}
+	void setDataCov(UInt32 idx, UInt32 x) {m_table[idx].data_cov = x;}
+	void setTemp(UInt32 idx, UInt32 x);
+	void setControllerTemp(UInt32 v, UInt32 x);
 
-	int getVaultAccess(int vault_i);
-	int getVaultDataCov(int vault_i);
-	int getVaultTemp(int vault_i);
-	bool isVaultTooHot(int vault_i);
-	bool isVaultTooFreq(int vault_i);
+	UInt32 getLogIdx(UInt32 idx);
+	UInt32 getAccess(UInt32 idx);
+	UInt32 getDataCov(UInt32 idx);
+	UInt32 getTemp(UInt32 idx);
+	bool isTooHot(UInt32 idx);
+	bool isTooFreq(UInt32 idx);
+	bool isJustRemapped(UInt32 idx);
+
+	UInt32 getVaultAccess(UInt32 vault_i);
+	UInt32 getVaultDataCov(UInt32 vault_i);
+	UInt32 getVaultTemp(UInt32 vault_i);
+	bool isVaultTooHot(UInt32 vault_i);
+	bool isVaultTooFreq(UInt32 vault_i);
 
 };
 
 class RemappingManager {
 	/*
 	m_remap_table, m_stat_unit;
-	int findTarget();
-	void issueRemap(int src, int des);
-	bool checkStat(int v, int b, bool remap);
-	void getPhysicalIndex(int* v_i, int* b_i); // return a physical global bank index, (useful for both remapping table structure)
+	UInt32 findTarget();
+	void issueRemap(UInt32 src, UInt32 des);
+	bool checkStat(UInt32 v, UInt32 b, bool remap);
+	void getPhysicalIndex(UInt32* v_i, UInt32* b_i); // return a physical global bank index, (useful for both remapping table structure)
 	*/
 public:
 	/* remapping policy: 
@@ -112,8 +119,8 @@ public:
 						3. migration vault remapping
 						4. migration bank remapping
 	 */
-	int policy = 1;
-	int n_vaults, n_banks;
+	UInt32 policy = 1;
+	UInt32 n_vaults, n_banks;
 	RemappingTable *m_remap_table;
 	StatStoreUnit *m_stat_unit;
 	StackedDramPerfUnison* m_dram_perf_cntlr;
@@ -121,20 +128,22 @@ public:
 	RemappingManager(StackedDramPerfUnison* dram_perf_cntlr);
 	~RemappingManager();
 
-	bool getPhysicalIndex(int* vault_i, int* bank_i);
-	void accessRow(int vault_i, int bank_i, int row_i, int req_times);
-	int findBankTarget();
-	int findVaultTarget();
-	void issueBankRemap(int src, int des);
-	void issueVaultRemap(int src, int des);
-	bool checkBankStat(int v, int  b);
-	bool checkStat(int v, int b, bool remap);
-	void handleRequest(int v, int b);
-	void updateTemperature(int v, int b, int temperature, int v_temp);
+	bool getPhysicalIndex(UInt32* vault_i, UInt32* bank_i);
+	void accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 req_times);
+	UInt32 findBankTarget(UInt32 idx);
+	UInt32 findVaultTarget(UInt32 vault_i);
+	void issueBankRemap(UInt32 src, UInt32 des);
+	void issueVaultRemap(UInt32 src, UInt32 des);
+	bool checkBankStat(UInt32 v, UInt32 b);
+	bool checkVaultStat(UInt32 v, UInt32 b);
+	bool checkStat(UInt32 v, UInt32 b, bool remap);
+	void handleRequest(UInt32 v, UInt32 b);
+	void updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp);
 
-	void reset(int v, int b);
+	void reset(UInt32 v, UInt32 b);
+	void finishRemapping();
 
-	bool checkMigrated(int v, int b);
+	bool checkMigrated(UInt32 v, UInt32 b);
 };
 
 #endif

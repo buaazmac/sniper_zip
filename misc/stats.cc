@@ -622,6 +622,12 @@ StatsManager::callHotSpot()
 			BankStatEntry *tmp = &bank_stats_interval[v_i][b_i];
 			temp_trace_log << ", Bank_" << v_i << "_" << b_i 
 				<< " Power: " << bank_power[v_i][b_i] << ", Total Access: " << tmp->reads + tmp->writes; 
+			/* (REMAP_MAN) Here We Want to Update Temperature 
+			 * Here we set vault controller temperature
+			 * to any bank in the vault (because of temperature sensor)
+			 */
+			int vault_temp = int(unit_temp[25 + v_i]);
+			m_stacked_dram_unison->updateTemperature(v_i, b_i, unit_temp[i], vault_temp);
 		}
 		temp_trace_log << std::endl;
 	}
@@ -685,12 +691,17 @@ StatsManager::recordStats(String prefix)
    sqlite3_bind_text(m_stmt_insert_prefix, 2, prefix.c_str(), -1, SQLITE_TRANSIENT);
    res = sqlite3_step(m_stmt_insert_prefix);
    LOG_ASSERT_ERROR(res == SQLITE_DONE, "Error executing SQL statement: %s", sqlite3_errmsg(m_db));
+   /* Update DRAM statistics*/
+   m_stacked_dram_unison->updateStats();
 
    /*prepare power data for HotSpot*/
    dumpHotspotInput();
 
    /* Call HotSpot in Sniper*/
    callHotSpot();
+
+   /* (REMAP_MAN) decide whether to remap*/
+   m_stacked_dram_unison->checkStat();
 
    /* Dump power trace during runtime*/
    //dumpDramPowerTrace();

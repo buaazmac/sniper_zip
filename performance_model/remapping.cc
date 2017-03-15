@@ -1,12 +1,12 @@
 #include "remapping.h"
 
-RemappingTable::RemappingTable(int vaults, int banks) :
+RemappingTable::RemappingTable(UInt32 vaults, UInt32 banks) :
 	n_vaults(vaults),
 	n_banks(banks)
 {
 	n_entries = n_vaults * n_banks;
 	m_table = new struct remapping_entry[n_entries];
-	for (int i = 0; i < n_entries; i++) {
+	for (UInt32 i = 0; i < n_entries; i++) {
 		m_table[i].phy = m_table[i].log = i;
 		m_table[i].valid = true;
 		m_table[i].migrated = false;
@@ -19,9 +19,9 @@ RemappingTable::~RemappingTable()
 }
 
 void
-RemappingTable::remapBankTo(int src, int des, bool invalid)
+RemappingTable::remapBankTo(UInt32 src, UInt32 des, bool invalid)
 {
-	int src_phy = m_table[src].phy, des_log = m_table[des].log;
+	UInt32 src_phy = m_table[src].phy, des_log = m_table[des].log;
 	m_table[src].phy = des;
 	m_table[des].log = src;
 	m_table[src_phy].log = des_log;
@@ -37,15 +37,15 @@ RemappingTable::remapBankTo(int src, int des, bool invalid)
 }
 
 void
-RemappingTable::remapVaultTo(int src, int des, bool invalid)
+RemappingTable::remapVaultTo(UInt32 src, UInt32 des, bool invalid)
 {
-	int src_bank_0 = src * n_banks, des_bank_0 = des * n_banks;
-	int src_phy = m_table[src_bank_0].phy / n_banks,
+	UInt32 src_bank_0 = src * n_banks, des_bank_0 = des * n_banks;
+	UInt32 src_phy = m_table[src_bank_0].phy / n_banks,
 		des_log = m_table[des_bank_0].log / n_banks;
-	for (int i = 0; i < n_banks; i++) {
-		int src_bid = src * n_banks + i,
+	for (UInt32 i = 0; i < n_banks; i++) {
+		UInt32 src_bid = src * n_banks + i,
 			remap_b = m_table[src_bid].phy % n_banks;
-		int des_bid = des * n_banks + remap_b;
+		UInt32 des_bid = des * n_banks + remap_b;
 		// phy[src] . des
 		m_table[src_bid].phy = des_bid;
 		// log[des] . src
@@ -57,10 +57,10 @@ RemappingTable::remapVaultTo(int src, int des, bool invalid)
 			m_table[src_bid].migrated = true;
 		}
 	}
-	for (int i = 0; i < n_banks; i++) {
-		int des_bid = des_log * n_banks + i,
+	for (UInt32 i = 0; i < n_banks; i++) {
+		UInt32 des_bid = des_log * n_banks + i,
 			remap_b = m_table[des_bid].phy % n_banks;
-		int src_bid = src_phy * n_banks + remap_b;
+		UInt32 src_bid = src_phy * n_banks + remap_b;
 		// phy[des_log] . src_phy
 		m_table[des_bid].phy = src_bid;
 		// log[src_phy] . des_log
@@ -74,32 +74,38 @@ RemappingTable::remapVaultTo(int src, int des, bool invalid)
 	}
 }
 
-int
-RemappingTable::getPhyIdx(int idx)
+UInt32
+RemappingTable::getPhyIdx(UInt32 idx)
 {
 	return m_table[idx].phy;
 }
 
-int
-RemappingTable::getLogIdx(int idx)
+UInt32
+RemappingTable::getLogIdx(UInt32 idx)
 {
 	return m_table[idx].log;
 }
 
 bool
-RemappingTable::getValid(int idx)
+RemappingTable::getValid(UInt32 idx)
 {
 	return m_table[idx].valid;
 }
+
+bool
+RemappingTable::getMigrated(UInt32 idx)
+{
+	return m_table[idx].migrated;
+}
 //-----------------------------------------------------
 
-StatStoreUnit::StatStoreUnit(int vaults, int banks) :
+StatStoreUnit::StatStoreUnit(UInt32 vaults, UInt32 banks) :
 	n_vaults(vaults),
 	n_banks(banks)
 {
 	n_entries = n_vaults * n_banks;
 	m_table = new struct stats_entry[n_entries];
-	for (int i = 0; i < n_entries; i++) {
+	for (UInt32 i = 0; i < n_entries; i++) {
 			m_table[i].idx = i;
 			m_table[i].access_count =m_table[i].data_cov = 0;
 			m_table[i].valid = true;
@@ -114,7 +120,7 @@ StatStoreUnit::~StatStoreUnit()
 }
 
 void
-StatStoreUnit::clear(int idx)
+StatStoreUnit::clear(UInt32 idx)
 {
 	m_table[idx].access_count = 0;
 	m_table[idx].data_cov = 0;
@@ -124,7 +130,7 @@ StatStoreUnit::clear(int idx)
 }
 
 void
-StatStoreUnit::swap(int x, int y)
+StatStoreUnit::swap(UInt32 x, UInt32 y)
 {
 	struct stats_entry temp = m_table[x];
 	m_table[x] = m_table[y];
@@ -134,93 +140,114 @@ StatStoreUnit::swap(int x, int y)
 }
 
 void
-StatStoreUnit::setTemp(int idx, int x)
+StatStoreUnit::remapBank(UInt32 src, UInt32 des)
+{
+	m_table[des].just_remapped = true;
+}
+
+void
+StatStoreUnit::remapVault(UInt32 src, UInt32 des)
+{
+	UInt32 src_base = src * n_banks, 
+		   des_base = des * n_banks;
+	for (UInt32 i = 0; i < n_banks; i++) {
+		m_table[des_base + i].just_remapped = true;
+	}
+}
+
+void
+StatStoreUnit::setTemp(UInt32 idx, UInt32 x)
 {
 	m_table[idx].temperature = x;
 	m_table[idx].too_hot = (x > temperature_threshold);
 }
 
 void
-StatStoreUnit::setControllerTemp(int idx, int x)
+StatStoreUnit::setControllerTemp(UInt32 idx, UInt32 x)
 {
 	m_table[idx].cntlr_temp = x;
 }
 
-int
-StatStoreUnit::getAccess(int idx)
+UInt32
+StatStoreUnit::getLogIdx(UInt32 idx)
+{
+	return m_table[idx].idx;
+}
+
+UInt32
+StatStoreUnit::getAccess(UInt32 idx)
 {
 	return m_table[idx].access_count;
 }
 
-int 
-StatStoreUnit::getDataCov(int idx) 
+UInt32 
+StatStoreUnit::getDataCov(UInt32 idx) 
 {
 	return m_table[idx].data_cov;
 }
 
-int
-StatStoreUnit::getTemp(int idx)
+UInt32
+StatStoreUnit::getTemp(UInt32 idx)
 {
 	return m_table[idx].temperature;
 }
 
 bool
-StatStoreUnit::isTooHot(int idx)
+StatStoreUnit::isTooHot(UInt32 idx)
 {
 	return m_table[idx].too_hot;
 }
 
 bool
-StatStoreUnit::isTooFreq(int idx)
+StatStoreUnit::isTooFreq(UInt32 idx)
 {
 	return (m_table[idx].access_count > bank_access_threshold);
 }
 
 bool
-StatStoreUnit::isJustRemapped(int idx)
+StatStoreUnit::isJustRemapped(UInt32 idx)
 {
 	return m_table[idx].just_remapped;
 }
 
-int
-StatStoreUnit::getVaultAccess(int vault_i)
+UInt32
+StatStoreUnit::getVaultAccess(UInt32 vault_i)
 {
-	int rst = 0;
-	int base_idx = vault_i * n_banks;
-	for (int i = 0; i < n_banks; i++) {
+	UInt32 rst = 0;
+	UInt32 base_idx = vault_i * n_banks;
+	for (UInt32 i = 0; i < n_banks; i++) {
 		rst += getAccess(base_idx + i);
 	}
 	return rst;
 }
 
-int
-StatStoreUnit::getVaultDataCov(int vault_i)
+UInt32
+StatStoreUnit::getVaultDataCov(UInt32 vault_i)
 {
-	int rst = 0;
-	int base_idx = vault_i * n_banks;
-	for (int i = 0; i < n_banks; i++) {
+	UInt32 rst = 0;
+	UInt32 base_idx = vault_i * n_banks;
+	for (UInt32 i = 0; i < n_banks; i++) {
 		rst += getDataCov(base_idx + i);
 	}
 	return rst;
 }
 
-int
-StatStoreUnit::getVaultTemp(int vault_i)
+UInt32 StatStoreUnit::getVaultTemp(UInt32 vault_i)
 {
-	int base_idx = vault_i * n_banks;
+	UInt32 base_idx = vault_i * n_banks;
 	return m_table[base_idx].cntlr_temp;
 }
 
 bool
-StatStoreUnit::isVaultTooHot(int vault_i)
+StatStoreUnit::isVaultTooHot(UInt32 vault_i)
 {
 	return (getVaultTemp(vault_i) > temperature_threshold);
 }
 
 bool
-StatStoreUnit::isVaultTooFreq(int vault_i)
+StatStoreUnit::isVaultTooFreq(UInt32 vault_i)
 {
-	int access = getVaultAccess(vault);
+	UInt32 access = getVaultAccess(vault_i);
 	return (access > vault_access_threshold);
 }
 
@@ -242,10 +269,10 @@ RemappingManager::~RemappingManager()
 }
 
 bool
-RemappingManager::getPhysicalIndex(int* vault_i, int* bank_i)
+RemappingManager::getPhysicalIndex(UInt32* vault_i, UInt32* bank_i)
 {
-	int global_idx = *vault_i * n_banks + *bank_i;
-	int phy_idx = m_remap_table->getPhyIdx(global_idx);
+	UInt32 global_idx = *vault_i * n_banks + *bank_i;
+	UInt32 phy_idx = m_remap_table->getPhyIdx(global_idx);
 	bool valid = m_remap_table->getValid(global_idx);
 	*vault_i = phy_idx / n_banks;
 	*bank_i = phy_idx % n_banks;
@@ -253,58 +280,97 @@ RemappingManager::getPhysicalIndex(int* vault_i, int* bank_i)
 }
 
 void
-RemappingManager::accessRow(int vault_i, int bank_i, int row_i, int req_times)
+RemappingManager::accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 req_times)
 {
-	int idx = vault_i * n_banks + bank_i;
-	int access = m_stat_unit->getAccess(idx);
-	int data_cov = m_stat_unit->getDataCov(idx);
+	UInt32 idx = vault_i * n_banks + bank_i;
+	UInt32 access = m_stat_unit->getAccess(idx);
+	UInt32 data_cov = m_stat_unit->getDataCov(idx);
 	m_stat_unit->setAccess(idx, access + req_times);
-	int part_id = (row_i >> 8) % 32;
+	UInt32 part_id = (row_i >> 8) % 32;
 	data_cov |= ((1 << part_id) - 1);
 	m_stat_unit->setDataCov(idx, data_cov);
 }
 
-int
-RemappingManager::findBankTarget()
+UInt32
+RemappingManager::findBankTarget(UInt32 idx)
 {
+	UInt32 v = idx / n_banks;
+	UInt32 base = v * n_banks;
+	UInt32 target = INVALID_TARGET;
 	if (policy == 1 || policy == 3) {
+		UInt32 max_access = 0;
+		for (UInt32 i = 0; i < n_banks; i++) {
+			UInt32 bank_i = base + i;
+			UInt32 ac = m_stat_unit->getAccess(bank_i);
+			if (m_remap_table->getLogIdx(bank_i) != idx && ac > max_access && 
+				m_stat_unit->isJustRemapped(bank_i) == false) {
+				max_access = ac;
+				target = bank_i;
+			}
+		}		
 	} else {
+		UInt32 max_access = 0;
+		for (UInt32 i = 0; i < n_vaults * n_banks; i++) {
+			UInt32 ac = m_stat_unit->getAccess(i);
+			if (m_remap_table->getLogIdx(i) != idx && ac > max_access 
+				&& m_stat_unit->isJustRemapped(i) == false) {
+				max_access = ac;
+				target = i;
+			}
+		}
 	}
-	return 0;
+	return target;
 }
 
-int
-RemappingManager::findVaultTarget()
+UInt32
+RemappingManager::findVaultTarget(UInt32 vault_i)
 {
-	return 0;
+	UInt32 target = INVALID_TARGET;
+	UInt32 max_access = 0;
+	for (UInt32 i = 0; i < n_vaults; i++) {
+		UInt32 base_idx = i * n_banks;
+		UInt32 log_v = m_remap_table->getLogIdx(base_idx) / n_banks;
+		UInt32 ac = m_stat_unit->getVaultAccess(i);
+
+		if (log_v != vault_i && ac > max_access 
+			&& m_stat_unit->isJustRemapped(base_idx) == false) {
+			max_access = ac;
+			target = i;
+		}
+	}
+	return target;
 }
 
 /* Change idx in remapping table*/
 /* Change logical idx in stat store unit*/
 void 
-RemappingManager::issueBankRemap(int src, int des)
+RemappingManager::issueBankRemap(UInt32 src, UInt32 des)
 {
 	bool invalid = false;
 	if (policy == 1 || policy == 2)
 		invalid = true;
+	m_remap_table->remapBankTo(src, des, invalid);
+	m_stat_unit->remapBank(src, des);
 }
 
 void 
-RemappingManager::issueVaultRemap(int src, int des)
+RemappingManager::issueVaultRemap(UInt32 src, UInt32 des)
 {
 	bool invalid = false;
 	if (policy == 1 || policy == 2)
 		invalid = true;
+	m_remap_table->remapVaultTo(src, des, invalid);
+	m_stat_unit->remapVault(src, des);
 }
 
 bool 
-RemappingManager::checkBankStat(int v, int b)
+RemappingManager::checkBankStat(UInt32 v, UInt32 b)
 {
-	int idx = v * n_banks + b;
-	int bank_access = m_stat_unit->getAccess(idx),
+	UInt32 idx = v * n_banks + b;
+	UInt32 bank_access = m_stat_unit->getAccess(idx),
 		bank_data_cov = m_stat_unit->getDataCov(idx);
 
-	int unit_temp = m_stat_unit->getTemp(idx);
+	UInt32 unit_temp = m_stat_unit->getTemp(idx);
 
 	bool bank_hot = m_stat_unit->isTooHot(idx),
 		 bank_freq = m_stat_unit->isTooFreq(idx),
@@ -314,17 +380,19 @@ RemappingManager::checkBankStat(int v, int b)
 
 	/* Here is our trigger function for bank remapping*/
 	if (bank_freq) {
+		return true;
 	}
+	return false;
 }
 
 bool
-RemappingManager::checkVaultStat(int v, int b)
+RemappingManager::checkVaultStat(UInt32 v, UInt32 b)
 {
-	int idx = v * n_banks + b;
-	int vault_access = m_stat_unit->getVaultAccess(v),
+	UInt32 idx = v * n_banks + b;
+	UInt32 vault_access = m_stat_unit->getVaultAccess(v),
 		vault_data_cov = m_stat_unit->getVaultDataCov(v);
 
-	int cntlr_temp = m_stat_unit->getVaultTemp(v);
+	UInt32 cntlr_temp = m_stat_unit->getVaultTemp(v);
 
 	bool vault_hot = m_stat_unit->isVaultTooHot(v),
 		 vault_freq = m_stat_unit->isVaultTooFreq(v),
@@ -340,12 +408,13 @@ RemappingManager::checkVaultStat(int v, int b)
 }
 
 bool
-RemappingManager::checkStat(int v, int b, bool remap)
+RemappingManager::checkStat(UInt32 v, UInt32 b, bool remap)
 {
 	/*TODO: 1. Here we get the statistics
 	 *		2. Decide whether to remap based on algorithm
 	 *		3. Issue Remap based on policy
 	 */
+	UInt32 idx = v * n_banks + b;
 	bool vault_hot = checkVaultStat(v, b),
 		 bank_hot = checkBankStat(v, b);
 
@@ -354,34 +423,44 @@ RemappingManager::checkStat(int v, int b, bool remap)
 	if (policy == 1) 
 	{
 		if (vault_hot) {
-			int phy_vault_target = findVaultTarget();
+			UInt32 phy_vault_target = findVaultTarget(v);
 			issueVaultRemap(v, phy_vault_target);
+#define REMAP_LOG
+#ifdef REMAP_LOG
+			std::cout << "[REMAP_MAN] Here we remap vault " << v << std::endl
+					 << "===Target is: " << phy_vault_target << std::endl;
+#endif
 		} else if (bank_hot) {
-			int phy_bank_target = findBankTarget();
+			UInt32 phy_bank_target = findBankTarget(idx);
 			issueBankRemap(idx, phy_bank_target);
+#define REMAP_LOG
+#ifdef REMAP_LOG
+			std::cout << "[REMAP_MAN] Here we remap bank " << idx << std::endl
+					 << "===Target is: " << phy_bank_target << std::endl;
+#endif
 		}
 	}
 	else if (policy == 2) 
 	{
 		if (bank_hot) {
-			int phy_bank_target = findBankTarget();
+			UInt32 phy_bank_target = findBankTarget(idx);
 			issueBankRemap(idx, phy_bank_target);
 		}
 	}
 	else if (policy == 3)
 	{
 		if (vault_hot) {
-			int phy_vault_target = findVaultTarget();
+			UInt32 phy_vault_target = findVaultTarget(v);
 			issueVaultRemap(v, phy_vault_target);
 		} else if (bank_hot) {
-			int phy_bank_target = findBankTarget();
+			UInt32 phy_bank_target = findBankTarget(idx);
 			issueBankRemap(idx, phy_bank_target);
 		}
 	}
 	else
 	{
 		if (bank_hot) {
-			int phy_bank_target = findBankTarget();
+			UInt32 phy_bank_target = findBankTarget(idx);
 			issueBankRemap(idx, phy_bank_target);
 		}
 	}
@@ -389,30 +468,41 @@ RemappingManager::checkStat(int v, int b, bool remap)
 }
 
 void
-RemappingManager::handleRequest(int v, int b)
+RemappingManager::handleRequest(UInt32 v, UInt32 b)
 {
 }
 
 void
-RemappingManager::updateTemperature(int v, int b, int temperature, int v_temp)
+RemappingManager::updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp)
 {
-	int idx = v * n_banks + b;
+	UInt32 idx = v * n_banks + b;
 	m_stat_unit->setTemp(idx, temperature);
 	m_stat_unit->setControllerTemp(idx, v_temp);
 }
 
 void
-RemappingManager::reset(int v, int b)
+RemappingManager::reset(UInt32 v, UInt32 b)
 {
-	int idx = v * n_banks + b;
+	UInt32 idx = v * n_banks + b;
 	m_remap_table->setValid(idx, true);
 	m_remap_table->setMigrated(idx, false);
 	m_stat_unit->clear(idx);
 }
 
-bool
-RemappingManager::checkMigrated(int v, int b)
+void
+RemappingManager::finishRemapping()
 {
-	int idx = v * n_banks + b;
-	return false;
+	for (UInt32 i = 0; i < n_vaults; i++) {
+		for (UInt32 j = 0; j < n_banks; j++) {
+			reset(i, j);
+		}
+	}
+}
+
+
+bool
+RemappingManager::checkMigrated(UInt32 v, UInt32 b)
+{
+	UInt32 idx = v * n_banks + b;
+	return m_remap_table->getMigrated(idx);
 }

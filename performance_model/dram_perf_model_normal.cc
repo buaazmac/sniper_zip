@@ -356,6 +356,12 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 	IntPtr page_offset;
 	UInt64 pc = 0;
 	UInt32 footprint = 0;
+	/* Here we need to translate virtual address to physical adress
+TODO:
+	 * We can use a map, to map virtual page to phsical page
+	 * Page Size: 2KB, We have 4GB physical memory
+	 * ----------> We have 2M physical pages
+	 */
 
 	if (SplitAddress(address, &set_n, &page_tag, &page_offset)) {
 	} else {
@@ -372,6 +378,9 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 		mem_op_type = Core::WRITE;
 	else
 		mem_op_type = Core::READ;
+
+	/* Place to call remapping manager (REMAP_MAN) */
+	SubsecondTime remap_delay = checkRemapping(pkt_time);
 
 	/* Try to acccess cache set*/
 	UInt8 hit = m_set[set_n]->accessAttempt(mem_op_type, page_tag, page_offset);
@@ -405,7 +414,7 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 		FHT[block_num] = new_footprint;
 		UInt32 load_blocks = 0;
 		while (new_footprint > 0) {
-			if (new_footprint & 1 == 1) {
+			if ((new_footprint & 1) == 1) {
 				load_blocks++;
 			}
 			new_footprint >>= 1;
@@ -458,68 +467,9 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 	}
 
 	/* Check vaults valid bit*/
+	
+	//m_dram_perf_model->checkTemperature(vault_i, bank_i);
 
-	m_dram_perf_model->checkTemperature(vault_i, bank_i);
-
-	bool v_valid_arr[32];
-	int b_valid_arr[32];
-	m_dram_perf_model->checkDramValid(v_valid_arr, b_valid_arr);
-	/*
-	for (UInt32 i = 0; i < 32; i++) {
-		v_valid_arr[i] = false;
-	}
-	*/
-	//v_valid_arr[vault_i] = false;
-
-	for (UInt32 i = 0; i < 32; i++) {
-		UInt32 row_num = (1 << row_bit);
-		UInt32 bank_num = (1 << bank_bit);
-		if (v_valid_arr[i]) {
-			int b_valid = b_valid_arr[i];
-			for (UInt32 bank_i = 0; bank_i < bank_num; bank_i++) {
-				if (((b_valid >> bank_i) & 1) == 0) {
-					#ifdef INVALID_LOG
-					log_file << "INVALID BANK #" << i << "_" << bank_i << std::endl;
-					#endif
-					for (UInt32 row_i = 0; row_i < row_num; row_i++) {
-						UInt32 set_i = bank_i << vault_bit << row_bit;
-						set_i |= (i << row_bit);
-						set_i |= row_i;
-						if (remap_invalid) {
-							m_set[set_i]->invalidateContent();
-						} else {
-							dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::WRITE); 
-							dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::READ); 
-						}
-					}
-				}
-			}
-		} else {
-			
-			//std::cout << "Core0's Power: " << Sim()->getStatsManager()->getMetricObject("core", 0, "power-dynamic")->recordMetric() << std::endl;
-			//std::cout << "Core0's renaming unit Power: " << Sim()->getStatsManager()->getMetricObject("ru", 0, "power-dynamic")->recordMetric() << std::endl;
-
-			//std::cout << "Core0's Power: " << Sim()->getStatsManager()->getMetricObject("core", 0, "energy-dynamic")->recordMetric() << std::endl;
-
-			#ifdef INVALID_LOG
-			log_file << "INVALID VAULT #" << i << std::endl;
-			#endif
-			/* we need to invalidate all sets in the vaults*/
-			for (UInt32 row_i = 0; row_i < row_num; row_i ++) {
-				for (UInt32 bank_i = 0; bank_i < bank_num; bank_i ++) {
-					UInt32 set_i = bank_i << vault_bit << row_bit;
-					set_i |= (i << row_bit);
-					set_i |= row_i;
-					if (remap_invalid) {
-						m_set[set_i]->invalidateContent();
-					} else {
-						dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::WRITE); 
-						dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::READ); 
-					}
-				}
-			}
-		}
-	}
 
 #ifdef ADDR_LOG
 	UInt32 hit_i32 = hit;
@@ -531,14 +481,70 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 			 << ", latency: " << dram_delay.getNS()
 			 << std::endl;
 #endif
-	m_dram_perf_model->finishInvalidation();
-	m_dram_perf_model->updateStats();
 
 	model_delay += dram_delay;
+	model_delay += remap_delay;
 	/**/
 	Sim()->getStatsManager()->updateCurrentTime(pkt_time);
 
 	return model_delay;
+}
+
+SubsecondTime
+StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time)
+{
+	UInt32 vault_bit = floorLog2(m_vault_num);
+	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
+	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
+
+	SubsecondTime dram_delay = SubsecondTime::Zero();
+	if (m_dram_perf_model->remapped == false) {
+		return dram_delay;
+	}
+
+	/* REMAP_DEBUG */
+	std::cout << "Here we found a remapping happened" << std::endl;
+
+	m_dram_perf_model->remapped = false;
+
+	bool v_valid_arr[32];
+	UInt32 b_valid_arr[32];
+	UInt32 b_migrated_arr[32];
+	//m_dram_perf_model->checkStat(vault_i, bank_i);
+	m_dram_perf_model->checkDramValid(v_valid_arr, b_valid_arr, b_migrated_arr);
+
+	for (UInt32 i = 0; i < 32; i++) {
+		UInt32 row_num = (1 << row_bit);
+		UInt32 bank_num = (1 << bank_bit);
+		UInt32 b_valid = b_valid_arr[i];
+		for (UInt32 bank_i = 0; bank_i < bank_num; bank_i++) {
+			if (((b_valid >> bank_i) & 1) == 0) {
+				#define INVALID_LOG
+				#ifdef INVALID_LOG
+				log_file << "INVALID BANK #" << i << "_" << bank_i << std::endl;
+				#endif
+				for (UInt32 row_i = 0; row_i < row_num; row_i++) {
+					UInt32 set_i = bank_i << vault_bit << row_bit;
+					set_i |= (i << row_bit);
+					set_i |= row_i;
+					/* TODO: Here we need to invalidate or migrate (REMAP_MAN)
+					 * We can use m_set[set_i]->calculateUsedBlock()
+					 * to reduce invalidation/migration overhead.
+					 */
+					
+					if (remap_invalid) {
+						m_set[set_i]->invalidateContent();
+					} else {
+						dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::WRITE); 
+						dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::READ); 
+					}
+				}
+			}
+		}
+	}
+	m_dram_perf_model->finishInvalidation();
+	//m_dram_perf_model->updateStats();
+	return dram_delay;
 }
 
 bool
