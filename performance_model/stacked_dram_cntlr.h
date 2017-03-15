@@ -20,9 +20,14 @@
 #include <fstream>
 
 #include "ramulator/dram_sim.h"
+#include "remapping.h"
 
 class VaultRemappingStructure;
 class BankRemappingStructure;
+
+class RemappingManager;
+
+//class RemappingManager;
 
 class StackedDramPerfMem {
 	public:
@@ -44,15 +49,50 @@ class StackedDramPerfMem {
 class StackedDramPerfUnison {
 	public:
 		UInt32 n_vaults;
+		UInt32 n_banks;
 		UInt32 m_vault_size;
 		UInt32 m_bank_size;
 		UInt32 m_row_size;
-		int tot_reads, tot_writes, tot_misses;
+		UInt32 tot_reads, tot_writes, tot_misses;
 
 		SubsecondTime last_req = SubsecondTime::Zero();
 
 		/* structure for vault remapping*/
 		VaultRemappingStructure *m_vremap_table;
+
+		/* Remapping Manager (REMAP_MAN)*/
+		RemappingManager* m_remap_manager;
+		bool remapped;
+		UInt32 v_remap_times, b_remap_times;
+
+		/* Some DRAM statistics*/
+		UInt32 tot_dram_reads, tot_dram_writes, tot_row_hits;
+		SubsecondTime tot_act_t, tot_pre_t, tot_rd_t, tot_wr_t;
+
+		/* Here we need a remapping table */
+		/* Here we need a statistics talbe */
+		/* Here is functions usable for remapping */
+		/*
+NOTICE: these functions may be called by DRAM cache controller
+	(StackedDramCacheCntlrUnison)
+TODO: we need to consider vault parrellelism
+		(we can enqueue all remapping requests into vault controllers (at most 4),
+		 and then later memory requests to other vault controllers would not be stalled,
+		 but we still need to wait on memory requests on those influenced controller)
+
+			bool tryRemapping(); 
+		    **Examine the statistics table
+		    **Find if there is any need to remap
+		    ****if yes, do remap, and return true
+		    ****else, return false
+
+			bool ckeckDramStatus(UInt32 v_id, UInt32 b_id);
+			**Examine the status of each DRAM part
+			**to help Cache Controller update cache status (set status)
+			**Input: id of part of DRAM need to be checked
+			**Output: valid or not
+		*/
+		
 
 		//Dram Model (ramulator)
 		DramModel* m_dram_model;
@@ -66,11 +106,14 @@ class StackedDramPerfUnison {
 
 		SubsecondTime getAccessLatency(SubsecondTime pkt_time, UInt32 pkt_size, UInt32 set_i, DramCntlrInterface::access_t access_type);
 
-		void checkDramValid(bool *valid_arr, int *banks);
+		void checkDramValid(bool *valid_arr, UInt32 *b_valid_arr, UInt32 *b_migrated_arr);
 		void checkTemperature(UInt32 idx, UInt32 bank_i);
+		/* check stats and remap (REMAP_MAN)*/
+		void checkStat();
 		void finishInvalidation();
 		void updateStats();
-		void clearCacheStats() {tot_reads = tot_writes = tot_misses = 0;};
+		void clearCacheStats();
+		void updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp);
 
 	private:
 		UInt32 *bankRemap;
@@ -85,7 +128,7 @@ class StackedDramPerfAlloy {
 
 		/* structure for vault remapping*/
 		VaultRemappingStructure *m_vremap_table;
-
+		
 		VaultPerfModel** m_vaults_array;
 		std::ofstream log_file;
 

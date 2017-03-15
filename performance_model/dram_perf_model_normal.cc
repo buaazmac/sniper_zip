@@ -289,7 +289,7 @@ StackDramCacheCntlrUnison::StackDramCacheCntlrUnison(
 	m_bank_size = 16 * 1024;
 	m_row_size = 8;
 	// Statistics for simulating memory operation
-	page_misses = block_misses = wb_blocks = 0;
+	cache_access = page_misses = block_misses = wb_blocks = 0;
 	// Choose Invalidation/Migration mechanism
 	remap_invalid = true;
 
@@ -299,45 +299,46 @@ StackDramCacheCntlrUnison::StackDramCacheCntlrUnison(
 	 */
 	Sim()->getStatsManager()->init_stacked_dram_unison(m_dram_perf_model);
 
+	/*
+	   Initial Page Table
+	*/
+	avail_phy_page_tag = 0;
+
 }
 
 StackDramCacheCntlrUnison::~StackDramCacheCntlrUnison()
 {
 	std::cout << "---deleting dram cache controller from NORMAL model" << std::endl;
 
-	std::ofstream myfile;
-	myfile.open("DramCacheAccess1.txt");
+	std::ofstream stat_file;
+	stat_file.open("BasicStatistics.txt");
 
-	myfile << "Simulation start" << std::endl;
-
-	UInt32 tot_access = 0, tot_miss = 0;
 	float miss_rate;
+	UInt32 tot_miss = page_misses + block_misses;
 
-	for (UInt32 i = 0; i < 32; i++) {
-		UInt32 i_access = dram_stats[i].reads + dram_stats[i].writes;
-		if (i_access != 0) 
-			miss_rate = (float)dram_stats[i].misses / (float)i_access;
-		else
-			miss_rate = 0;
-		myfile << "dram_cache_" << i << ", access: " << i_access 
-			<< ", miss: " << dram_stats[i].misses << ", miss rate: " << miss_rate 
-			<< std::endl;
-		tot_access += i_access;
-		tot_miss += dram_stats[i].misses;
-	}
-
-	if (tot_access != 0) 
-		miss_rate = (float)tot_miss / (float)tot_access;
+	if (cache_access != 0) 
+		miss_rate = (float)tot_miss / (float)cache_access;
 	else
 		miss_rate = 0;
-	myfile << "dram_cache_total access: " << tot_access 
-		<< ", miss: " << tot_miss << ", miss rate: " << miss_rate 
-		<< std::endl;
-	myfile.close();
 
-	std::cout << "[EXTRA OUTPUT] DRAM Total Access: " << tot_access 
-		<< ", miss: " << tot_miss << ", miss rate: " << miss_rate 
-		<< std::endl;
+	stat_file << "[EXTRA OUTPUT] DRAM Total Access: " << cache_access 
+			  << ", miss: " << tot_miss << ", miss rate: " << miss_rate 
+			  << std::endl;
+	stat_file << "[EXTRA OUTPUT] DRAM Remap Times: " 
+			  << m_dram_perf_model->v_remap_times << " vault remaps, "
+			  << m_dram_perf_model->b_remap_times << " bank remaps."
+			  << std::endl;
+	stat_file << "[EXTRA OUTPUT] DRAM Statistics: " 
+			  << m_dram_perf_model->tot_dram_reads << " reads, "
+			  << m_dram_perf_model->tot_dram_writes << " writes, "
+			  << m_dram_perf_model->tot_row_hits << " row hits, "
+			  << m_dram_perf_model->tot_act_t.getUS() << " ACT time, "
+			  << m_dram_perf_model->tot_pre_t.getUS() << " PRE time, "
+			  << m_dram_perf_model->tot_rd_t.getUS() << " RD time, "
+			  << m_dram_perf_model->tot_wr_t.getUS() << " WR time."
+			  << std::endl;
+
+	stat_file.close();
 
 	log_file.close();
 	delete m_set_info;
@@ -384,6 +385,7 @@ TODO:
 
 	/* Try to acccess cache set*/
 	UInt8 hit = m_set[set_n]->accessAttempt(mem_op_type, page_tag, page_offset);
+	cache_access ++;
 
 
 	/*
@@ -547,9 +549,26 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time)
 	return dram_delay;
 }
 
-bool
-StackDramCacheCntlrUnison::SplitAddress(IntPtr address, UInt32 *set_n, IntPtr *page_tag, IntPtr *page_offset)
+IntPtr
+StackDramCacheCntlrUnison::translateAddress(IntPtr address)
 {
+	IntPtr offset = address & ((1 << 11) - 1);
+	IntPtr tag = 0;
+	
+	if (page_table.find(address) != page_table.end()) {
+		tag = page_table[address];
+	} else {
+		tag = avail_phy_page_tag;
+		page_table[address] = avail_phy_page_tag;
+	}
+	avail_phy_page_tag ++;
+	return ((tag << 11) | offset);
+}
+
+bool
+StackDramCacheCntlrUnison::SplitAddress(IntPtr v_address, UInt32 *set_n, IntPtr *page_tag, IntPtr *page_offset)
+{
+	IntPtr address = translateAddress(v_address);
 	*page_offset = address % m_pagesize;
 	UInt64 addr = address / m_pagesize;
 	*set_n = addr & ((1UL << floorLog2(m_set_num)) - 1);

@@ -21,6 +21,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <map>
 
 class DramCachePageInfo
 {
@@ -147,7 +148,7 @@ class StackDramCacheCntlrUnison
 		UInt32 m_bank_size;
 		UInt32 m_row_size;
 
-		UInt32 page_misses, block_misses;
+		UInt32 cache_access, page_misses, block_misses;
 		UInt32 wb_blocks;
 
 		//log file
@@ -162,6 +163,13 @@ class StackDramCacheCntlrUnison
 		~StackDramCacheCntlrUnison();
 
 		SubsecondTime ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::access_t access_type, IntPtr address);
+		SubsecondTime checkRemapping(SubsecondTime pkt_time);
+
+		/* Virtual-Physical Page Table*/
+		UInt32 avail_phy_page_tag;
+		std::map<IntPtr, IntPtr> page_table;
+		IntPtr translateAddress(IntPtr address);
+
 		bool SplitAddress(IntPtr address, UInt32 *set_n, IntPtr *page_tag, IntPtr *page_offset);
 
 		friend class DramPerfModelNormal;

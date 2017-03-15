@@ -127,11 +127,15 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 	}
 
 	m_vremap_table = new VaultRemappingStructure(vaults_num);
-	/* Remapping Managere*/
-	m_remap_manager = new RemappingManager(this);
+	/* (REMAP_MAN) Remapping Managere, policy defined here*/
+	m_remap_manager = new RemappingManager(this, 1);
 	remapped = false;
+	v_remap_times = b_remap_times = 0;
 
-	tot_reads = tot_writes = tot_misses;
+	tot_reads = tot_writes = tot_misses = 0;
+	/* Initialize dram statistics*/
+	tot_dram_reads = tot_dram_writes = tot_row_hits = 0;
+	tot_act_t = tot_pre_t = tot_rd_t = tot_wr_t = SubsecondTime::Zero();
 	
 	/*
 	   Initial DRAM simulator (ramulator)
@@ -143,6 +147,7 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 
 StackedDramPerfUnison::~StackedDramPerfUnison()
 {
+	/*
 	std::ofstream myfile;
 	myfile.open("StackedDramUnison.txt");
 
@@ -183,6 +188,7 @@ StackedDramPerfUnison::~StackedDramPerfUnison()
 	myfile << "Total time: " << tot_ACT << ", " << tot_PRE << ", " << tot_RD << ", " << tot_WR << std::endl;
 	myfile << "Total access: "  << tot_access << ", Row Hit Rate: " << row_hit_rate << std::endl;
 	myfile.close();
+	*/
 
 	// DEBUG
 	log_file.close();
@@ -292,7 +298,7 @@ TODO: Here we need to handle memory request with physical index
 			clks++;
 			while (stall) {
 
-				std::cout << "here is a stall!!" << std::endl;
+				//std::cout << "here is a stall!!" << std::endl;
 
 				stall = !m_dram_model->readRow(remapVault, remapBank, row_i, 0);
 				m_dram_model->tickOnce();
@@ -304,7 +310,7 @@ TODO: Here we need to handle memory request with physical index
 			clks++;
 			while (stall) {
 
-				std::cout << "here is a stall!!" << std::endl;
+				//std::cout << "here is a stall!!" << std::endl;
 
 				stall = !m_dram_model->writeRow(remapVault, remapBank, row_i, 0);
 				m_dram_model->tickOnce();
@@ -365,16 +371,22 @@ StackedDramPerfUnison::checkStat()
 {
 	/* here we check stats of DRAM and swap (REMAP_MAN)*/
 	std::cout << "[REMAP_MAN]Here we check DRAM stat to decide swap or not!" << std::endl;
-	bool swap = true;
+	bool remap = false;
 	
 	if (m_remap_manager->policy == 1 || m_remap_manager->policy == 3) {
 		for (UInt32 i = 0; i < n_vaults; i++) {
-			m_remap_manager->checkStat(i, 0, swap);
+			bool rst = m_remap_manager->checkStat(i, 0, remap);
+			if (rst) {
+				v_remap_times ++;
+			}
 		}
 	} else {
 		for (UInt32 i = 0; i < n_vaults; i++) {
 			for (UInt32 j = 0; j < n_banks; j++) {
-				m_remap_manager->checkStat(i, j, swap);
+				bool rst = m_remap_manager->checkStat(i, j, remap);
+				if (rst) {
+					b_remap_times ++;
+				}
 			}
 		}
 	}
@@ -430,12 +442,22 @@ StackedDramPerfUnison::updateStats()
 		vault->stats.reads = m_dram_model->getVaultRdReq(i);
 		vault->stats.writes = m_dram_model->getVaultWrReq(i);
 		vault->stats.row_hits = m_dram_model->getVaultRowHits(i);
+
+		tot_dram_reads += vault->stats.reads;
+		tot_dram_writes += vault->stats.writes;
+		tot_row_hits += vault->stats.row_hits;
+
 		for (UInt32 j = 0; j < vault->n_banks; j++) {
 			BankPerfModel* bank = vault->m_banks_array[j];
 			bank->stats.tACT = SubsecondTime::NS(m_dram_model->getBankActTime(i, j));
 			bank->stats.tPRE = SubsecondTime::NS(m_dram_model->getBankActTime(i, j));
 			bank->stats.tRD = SubsecondTime::NS(m_dram_model->getBankRdTime(i, j));
 			bank->stats.tWR = SubsecondTime::NS(m_dram_model->getBankWrTime(i, j));
+
+			tot_act_t += bank->stats.tACT;
+			tot_pre_t += bank->stats.tPRE;
+			tot_rd_t += bank->stats.tRD;
+			tot_wr_t += bank->stats.tWR;
 		}
 	}
 }

@@ -51,6 +51,8 @@ public:
 
 	UInt32 getPhyIdx(UInt32 idx);
 	UInt32 getLogIdx(UInt32 idx);
+	UInt32 getPhyVault(UInt32 idx);
+	UInt32 getLogVault(UInt32 idx);
 	bool getValid(UInt32 idx);
 	bool getMigrated(UInt32 idx);
 };
@@ -125,7 +127,7 @@ public:
 	StatStoreUnit *m_stat_unit;
 	StackedDramPerfUnison* m_dram_perf_cntlr;
 
-	RemappingManager(StackedDramPerfUnison* dram_perf_cntlr);
+	RemappingManager(StackedDramPerfUnison* dram_perf_cntlr, UInt32 p);
 	~RemappingManager();
 
 	bool getPhysicalIndex(UInt32* vault_i, UInt32* bank_i);
