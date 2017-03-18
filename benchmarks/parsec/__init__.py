@@ -17,7 +17,6 @@ def allbenchmarks():
       __allbenchmarks = sorted(benchmarks)
     except OSError:
       return None
-  print __allbenchmarks
   return __allbenchmarks
 
 
@@ -116,7 +115,16 @@ class Program:
       return 1
 
     flags = []
-    rundir = tempfile.mkdtemp()
+    rundir = ""
+    cmd_arr = graphitecmd.split()
+    for i in range(len(cmd_arr)):
+      if cmd_arr[i] == '-d':
+        rundir = os.path.abspath(cmd_arr[i+1][1:-1])
+        print "set sniper output dir: ", rundir
+        break
+    if not rundir:
+      rundir = tempfile.mkdtemp()
+      print "creating temp dir:", rundir
 
     if self.program == 'facesim':
       # Facesim needs a {rundir}/Storytelling/output directory and tries to create it with a system() call
@@ -139,9 +147,7 @@ class Program:
                      ] + flags)
     proc.communicate()
 
-    os.system('mkdir ' + HOME + '/' + self.program + '-' + self.inputsize)
-    os.system('cp ' + rundir + '/apps/' + self.program + '/run/* ' + HOME + '/' + self.program + '-' + self.inputsize)
-    os.system('rm -rf %(rundir)s' % locals())
+    #os.system('rm -r %(rundir)s' % locals())
     return proc.returncode
 
   def rungraphiteoptions(self):

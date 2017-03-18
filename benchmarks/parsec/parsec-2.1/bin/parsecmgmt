@@ -308,7 +308,7 @@ Examples:
   nthreads=""
   submit=""
   extension=""
-  keep_rundir=""
+  keep_rundir="yes"
   while [ ! -z "$1" ]; do
     arg="$1"
     case "${arg}" in
@@ -844,7 +844,8 @@ function run_benchmark {
     echo "${oprefix} Error: Group of benchmark '${benchmark}' is unknown." | ${TEE} ${log}
     exit 1
   fi
-  local bmrundir="${rundir}/${benchmarkgroup}/${benchmark}/run"
+  #local bmrundir="${rundir}/${benchmarkgroup}/${benchmark}/run"
+  local bmrundir="${rundir}"
   local bmdir="${PARSECDIR}/pkgs/${benchmarkgroup}/${benchmark}"
   local bminputdir="${bmdir}/inputs"
   local bmoutputdir="${bmdir}/outputs"
@@ -900,10 +901,8 @@ function run_benchmark {
     fi
 
     echo "${oprefix} Setting up run directory." | ${TEE} ${log}
+    echo "Run directory: " ${bmrundir}
     ${MKDIR} ${bmrundir} | ${TEE} ${log}
-	echo "[ZMAC] ${oprefix} cp -R ./HotSpot ${bmrundir}"
-	cp -R ./HotSpot ${bmrundir}
-
     pushd "${bmrundir}" > /dev/null
 
     # Determine input archive
