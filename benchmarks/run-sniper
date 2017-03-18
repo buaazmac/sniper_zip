@@ -255,6 +255,10 @@ if benchmarks:
       tracefiles_created.append(filename)
 
 outputdir = abspath(outputdir)
+print outputdir
+os.system('cp -R HotSpot ' + outputdir)
+os.system('cp -R ramulator ' + outputdir)
+
 os.chdir(outputdir)
 
 os.environ['LD_LIBRARY_PATH'] = '%s:%s/libs' % (os.environ.get('LD_LIBRARY_PATH', ''), HOME)
