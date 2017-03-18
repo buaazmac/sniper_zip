@@ -48,14 +48,13 @@ class DramCachePageInfo
 
 	public:
 		DramCachePageInfo();
-
 		DramCachePageInfo(IntPtr tag, CacheState::cstate_t cstate);
 
 		~DramCachePageInfo();
 
 		static DramCachePageInfo* create();
 
-		void invalidate(void);
+		UInt32 invalidate(void);
 		void clone(DramCachePageInfo* cache_page_info);
 
 		bool isValid() const { return (m_tag != ((IntPtr) ~0)); }
@@ -98,7 +97,8 @@ class DramCacheSetUnison
 		~DramCacheSetUnison();
 
 		UInt32 getReplacementIndex();
-		void invalidateContent();
+		UInt32 invalidateContent();
+		UInt32 getValidBlocks();
 		void updateReplacementIndex(UInt32);
 		void updateReplacementIndexTag(UInt32 index, IntPtr tag, IntPtr pc, IntPtr offset, UInt32 footprint);
 
@@ -149,7 +149,7 @@ class StackDramCacheCntlrUnison
 		UInt32 m_row_size;
 
 		UInt32 cache_access, page_misses, block_misses;
-		UInt32 wb_blocks;
+		UInt32 wb_blocks, ld_blocks;
 
 		//log file
 		std::ofstream log_file;

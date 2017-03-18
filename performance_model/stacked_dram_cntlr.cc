@@ -233,7 +233,6 @@ StackedDramPerfUnison::getAccessLatency(
 	bool valid_bit = m_remap_manager->getPhysicalIndex(&remapVault, &remapBank);
 
 	//debug
-#define LOG_OUTPUT
 #ifdef LOG_OUTPUT
 	log_file << "Set num: " << set_i 
 			  << ", vault_i: " << vault_i
@@ -287,6 +286,13 @@ TODO: Here we need to handle memory request with physical index
 	/* (REMAP_MAN) Here we update statistics store unit*/
 	m_remap_manager->accessRow(remapVault, remapBank, row_i, req_times);
 
+	/* STAT_DEBUG */
+	if (access_type == DramCntlrInterface::READ) {
+		tot_reads ++;
+	} else {
+		tot_writes ++;
+	}
+
 	while (req_times > 0) {
 		req_times --;
 
@@ -337,33 +343,6 @@ void
 StackedDramPerfUnison::checkTemperature(UInt32 vault_i, UInt32 bank_i)
 {
 	std::cout << "check temperature (is useless)\n";
-
-	/* balance vaults
-
-	if (m_vremap_table->isTooHot(idx, bank_i)) {
-		
-		bool valid = false;
-		UInt32 remap_id = m_vremap_table->getVaultIdx(idx, &valid);
-#ifdef LOG_OUTPUT
-		log_file << "@Vault_" << idx << " is too hot!\n";
-		log_file << "@original map: " 
-				 << remap_id
-				 << "  valid: " << valid
-				 << std::endl;
-#endif
-
-		m_vremap_table->balanceVaults(idx);
-
-#ifdef LOG_OUTPUT
-		remap_id = m_vremap_table->getVaultIdx(idx, &valid);
-		log_file << "@now map: " 
-				 << remap_id 
-				 << "  valid: " << valid
-				 << std::endl;
-#endif
-	}
-
-	*/
 }
 
 void
@@ -371,7 +350,7 @@ StackedDramPerfUnison::checkStat()
 {
 	/* here we check stats of DRAM and swap (REMAP_MAN)*/
 	std::cout << "[REMAP_MAN]Here we check DRAM stat to decide swap or not!" << std::endl;
-	bool remap = false;
+	bool remap = true;
 	
 	if (m_remap_manager->policy == 1 || m_remap_manager->policy == 3) {
 		for (UInt32 i = 0; i < n_vaults; i++) {
@@ -396,27 +375,30 @@ StackedDramPerfUnison::checkStat()
 void
 StackedDramPerfUnison::checkDramValid(bool *valid_arr, UInt32* b_valid_arr, UInt32* b_migrated_arr)
 {
-	log_file << "[REMAP_CHECK] Here we start to check valid bit: ";
+	//log_file << "[REMAP_CHECK] Here we start to check valid bit: ";
 
 	for (int i = 0; i < n_vaults; i++) {
 		UInt32 bank_valid = 0, bank_migrated = 0;
 		//bool vault_valid = m_vremap_table->isValid(i, &bank_valid);
 		bool vault_valid = true;
-		for (int j = n_banks; j >= 0; j--) {
+		for (int j = n_banks - 1; j >= 0; j--) {
 			UInt32 vault_i = i, bank_i = j;
 			bool valid = m_remap_manager->getPhysicalIndex(&vault_i, &bank_i);
 			bool migrated = m_remap_manager->checkMigrated(i, j);
-			if (!valid) {
+			if (valid) {
 				bank_valid |= 1;
 
-				log_file << i << "_" << j << "(" << vault_i << ")-invalid, " << bank_i;
+				//log_file << i << "_" << j << "(" << vault_i << ")-invalid, " << bank_i;
 			}
 			if (migrated) {
 				bank_migrated |= 1;
 
-				log_file << i << "_" << j << "(" << vault_i << ")-migrated, " << bank_i;
+				//log_file << i << "_" << j << "(" << vault_i << ")-migrated, " << bank_i;
 			}
-			bank_valid <<= 1;
+			if (j > 0) {
+				bank_valid <<= 1;
+				bank_migrated <<= 1;
+			}
 		}
 		if (vault_valid) {
 			valid_arr[i] = true;
@@ -437,11 +419,35 @@ StackedDramPerfUnison::finishInvalidation()
 void
 StackedDramPerfUnison::updateStats()
 {
+	/* STAT_DEBUG*/
+	int memory_remaining_ticks = m_dram_model->interval_ticks;
+	std::cout << "[update stats]------------" << std::endl;
+	std::cout << "---tot_reads: " << tot_reads
+			  << "---tot_writes: " << tot_writes
+			  << "---remaining mem tick: " << memory_remaining_ticks
+			  << std::endl;
+	/* Tick Ramulator until queue empty*/
+	for (UInt32 i = 0; i < memory_remaining_ticks; i++) {
+		m_dram_model->tickOnce();
+	}
+	m_dram_model->resetIntervalTick();
+
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		VaultPerfModel* vault = m_vaults_array[i];
 		vault->stats.reads = m_dram_model->getVaultRdReq(i);
 		vault->stats.writes = m_dram_model->getVaultWrReq(i);
 		vault->stats.row_hits = m_dram_model->getVaultRowHits(i);
+
+		UInt32 serv_rd = m_dram_model->getServingRdReq(i);
+		UInt32 serv_wr = m_dram_model->getServingWrReq(i);
+
+	/* STAT_DEBUG*/
+		std::cout << "vault_" << i << "-> "
+				  << "reads: " << vault->stats.reads
+				  << ", writes: " << vault->stats.writes
+				  << ", serving_reads: " << serv_rd
+				  << ", serving_writes: " << serv_wr
+				  << std::endl;
 
 		tot_dram_reads += vault->stats.reads;
 		tot_dram_writes += vault->stats.writes;

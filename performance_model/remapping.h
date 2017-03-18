@@ -73,9 +73,9 @@ public:
 		bool too_hot, valid, just_remapped;
 	};
 	UInt32 n_vaults, n_banks;
-	const UInt32 temperature_threshold = 90;
-	const UInt32 bank_access_threshold = 2000;
-	const UInt32 vault_access_threshold = 3000;
+	const UInt32 temperature_threshold = 85;
+	const UInt32 bank_access_threshold = 100;
+	const UInt32 vault_access_threshold = 300;
 	UInt32 n_entries;
 	struct stats_entry* m_table;
 	StatStoreUnit(UInt32 vaults, UInt32 banks);
@@ -89,6 +89,7 @@ public:
 	void setDataCov(UInt32 idx, UInt32 x) {m_table[idx].data_cov = x;}
 	void setTemp(UInt32 idx, UInt32 x);
 	void setControllerTemp(UInt32 v, UInt32 x);
+	void enableRemapping(UInt32 idx) {m_table[idx].just_remapped = false;};
 
 	UInt32 getLogIdx(UInt32 idx);
 	UInt32 getAccess(UInt32 idx);
@@ -121,7 +122,7 @@ public:
 						3. migration vault remapping
 						4. migration bank remapping
 	 */
-	UInt32 policy = 1;
+	UInt32 policy;
 	UInt32 n_vaults, n_banks;
 	RemappingTable *m_remap_table;
 	StatStoreUnit *m_stat_unit;
@@ -143,6 +144,7 @@ public:
 	void updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp);
 
 	void reset(UInt32 v, UInt32 b);
+	void resetRemapping();
 	void finishRemapping();
 
 	bool checkMigrated(UInt32 v, UInt32 b);

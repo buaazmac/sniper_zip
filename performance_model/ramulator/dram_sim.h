@@ -33,6 +33,7 @@ public:
 	RamMemory* memory;
 	map<int, int> latencies;
 	function<void(RamRequest&)> read_complete;
+	int interval_ticks;
 
 	void printSpec();
 
@@ -44,6 +45,7 @@ public:
 	bool writeRow(int vault, int bank, int row, int col);
 
 	void tickOnce();
+	void resetIntervalTick();
 
 	/* The unit of all time stats is "NS" */
 
@@ -54,6 +56,9 @@ public:
 	uint64_t getVaultRdReq(int vault);
 	
 	uint64_t getVaultWrReq(int vault);
+
+	uint64_t getServingRdReq(int vault);
+	uint64_t getServingWrReq(int vault);
 
 	uint64_t getVaultRowHits(int vault);
 

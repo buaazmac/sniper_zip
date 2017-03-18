@@ -551,7 +551,6 @@ StatsManager::dumpHotspotInput()
    Here we can choose to measure the results of 2.5D model
    In which, we turn off the power of CPU components
  */
-#define __ONLY_DRAM__
 #ifdef __ONLY_DRAM__
 	power_L3 = 0;
 	for (int i = 0; i < 4; i++) {

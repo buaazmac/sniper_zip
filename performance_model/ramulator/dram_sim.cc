@@ -25,6 +25,9 @@ DramModel::DramModel(const std::string& fname)
 
 	/* Construct the initial request*/
 	read_complete = [this](RamRequest& r) {this->latencies[r.depart - r.arrive]++; };
+
+	/* interval ticks initialization*/
+	interval_ticks = 500000;
 }
 
 DramModel::~DramModel()
@@ -126,6 +129,12 @@ bool DramModel::writeRow(int vault, int bank, int row, int col)
 void DramModel::tickOnce()
 {
 	memory->tick();
+	interval_ticks --;
+}
+
+void DramModel::resetIntervalTick()
+{
+	interval_ticks = 500000;
 }
 
 int DramModel::getReadLatency(int vault)
@@ -158,6 +167,18 @@ uint64_t DramModel::getVaultWrReq(int vault)
 	uint64_t wr_row_misses = memory->ctrls[vault]->write_row_misses[0].value();
 	uint64_t wr_row_conflicts = memory->ctrls[vault]->write_row_conflicts[0].value();
 	return (wr_row_hits + wr_row_misses + wr_row_conflicts);
+}
+
+uint64_t 
+DramModel::getServingRdReq(int vault)
+{
+	return memory->ctrls[vault]->channel->serving_reads.value();
+}
+
+uint64_t 
+DramModel::getServingWrReq(int vault)
+{
+	return memory->ctrls[vault]->channel->serving_writes.value();
 }
 
 uint64_t DramModel::getVaultRowHits(int vault)

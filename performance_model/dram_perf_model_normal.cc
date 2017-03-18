@@ -38,9 +38,15 @@ DramCachePageInfo::DramCachePageInfo(IntPtr tag, CacheState::cstate_t cstate)
 DramCachePageInfo::~DramCachePageInfo()
 {}
 
-void
+UInt32
 DramCachePageInfo::invalidate()
 {
+	UInt32 wb_blocks = 0;
+	while (dbits_0 > 0) {
+		if ((dbits_0 & 1) == 1)
+			wb_blocks++;
+		dbits_0 >>= 1;
+	}
 	m_tag = ~0;
 	m_cstate = CacheState::INVALID;
 	vbits_0 = ~0;
@@ -50,6 +56,7 @@ DramCachePageInfo::invalidate()
 	m_used = 0;
 	offset = 0;
 	m_footprint = 0;
+	return wb_blocks;
 }
 
 void
@@ -82,13 +89,13 @@ DramCachePageInfo::accessBlock(Core::mem_op_t type, UInt32 block_num)
 		 d1 = (dbits_1 >> (block_num - 1)) & 1;
 
 	// set block valid anyway: load block if miss
-	vbits_0 = vbits_0 | (1UL << (block_num - 1));
+	vbits_0 = vbits_0 | (1UL << block_num);
 	// set block dirty if write operation
 	if (type == Core::WRITE) {
-		dbits_0 = dbits_0 | (1UL << (block_num - 1));
+		dbits_0 = dbits_0 | (1UL << block_num);
 	}
 	// set block footprint
-	m_footprint = m_footprint | (1UL << (block_num - 1));
+	m_footprint = m_footprint | (1UL << block_num);
 	if (v1 || d0 || d1) {};
 
 	if (v0) return true;
@@ -159,14 +166,34 @@ DramCacheSetUnison::getReplacementIndex()
 	return index;
 }
 
-void
+UInt32
 DramCacheSetUnison::invalidateContent()
 {
+	//std::cout << "before invalidate content" << std::endl;
+	UInt32 wb_blocks = 0;
 	for (UInt32 i = 0; i < m_associativity; i++) {
-
-		m_cache_page_info_array[i]->invalidate();
-
+		wb_blocks += m_cache_page_info_array[i]->invalidate();
 	}
+	//std::cout << "end invalidate content" << std::endl;
+	return wb_blocks;
+}
+
+UInt32
+DramCacheSetUnison::getValidBlocks()
+{
+	//std::cout << "before get valid blocks" << std::endl;
+	UInt32 valid_blocks = 0;
+	for (UInt32 i = 0; i < m_associativity; i++) {
+		UInt32 vb = m_cache_page_info_array[i]->getValidBits();
+		while (vb > 0) {
+			if ((vb & 1) == 1) {
+				valid_blocks ++;
+			}
+			vb >>= 1;
+		}
+	}
+	//std::cout << "after get valid blocks" << std::endl;
+	return valid_blocks;
 }
 
 void
@@ -289,7 +316,7 @@ StackDramCacheCntlrUnison::StackDramCacheCntlrUnison(
 	m_bank_size = 16 * 1024;
 	m_row_size = 8;
 	// Statistics for simulating memory operation
-	cache_access = page_misses = block_misses = wb_blocks = 0;
+	cache_access = page_misses = block_misses = wb_blocks = ld_blocks = 0;
 	// Choose Invalidation/Migration mechanism
 	remap_invalid = true;
 
@@ -352,6 +379,7 @@ StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInter
 {
 	SubsecondTime model_delay = SubsecondTime::Zero();
 	SubsecondTime dram_delay = SubsecondTime::Zero();
+	SubsecondTime mem_access_delay = SubsecondTime::Zero();
 	UInt32 set_n;
 	IntPtr page_tag;
 	IntPtr page_offset;
@@ -396,6 +424,9 @@ TODO:
 	// access tag need a read
 	dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, DramCntlrInterface::READ); 
 
+	/* Here we record how many load/write to main memory after cache */
+	UInt32 load_blocks = 0, writeback_blocks = 0;
+
 	if (hit == 0) { // page is not in cache
 		page_misses ++;
 
@@ -409,21 +440,25 @@ TODO:
 		   4. update footprint history table
 		   */
 
-		// page eviction & load new page
-		m_set[set_n]->updateReplacementIndexTag(index, page_tag, pc, page_offset, footprint);
-
 		// update footprint history table
 		UInt32 new_footprint = m_set[set_n]->m_cache_page_info_array[index]->getFootprint();
 		FHT[block_num] = new_footprint;
-		UInt32 load_blocks = 0;
 		while (new_footprint > 0) {
 			if ((new_footprint & 1) == 1) {
 				load_blocks++;
 			}
 			new_footprint >>= 1;
 		}
-		wb_blocks += load_blocks;
-		dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64 * load_blocks, set_n, DramCntlrInterface::WRITE); 
+		// page eviction & load new page
+		writeback_blocks = m_set[set_n]->m_cache_page_info_array[index]->invalidate();
+		wb_blocks += writeback_blocks;
+		ld_blocks += load_blocks;
+
+		m_set[set_n]->updateReplacementIndexTag(index, page_tag, pc, page_offset, footprint);
+
+		/* Write Back Dirty Blocks*/
+		dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64 * writeback_blocks, set_n, DramCntlrInterface::WRITE); 
+		/* Load New Blocks from Memory*/
 
 		// calculate model delay (page load): load a page (1 page = 1984 B)
 		// 1 write = 2 read
@@ -440,10 +475,15 @@ TODO:
 	    //model_delay += m_dram_bandwidth.getRoundedLatency(64);
 		dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, DramCntlrInterface::WRITE); 
 
-		model_delay += m_dram_bandwidth.getRoundedLatency(8 * 32);
+		load_blocks ++;
+		//model_delay += m_dram_bandwidth.getRoundedLatency(8 * 64);
 	} 
 
 	dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, access_type); 
+
+	/* Here we update memory access delays*/
+	mem_access_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * load_blocks);
+	mem_access_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * writeback_blocks);
 
 
 	UInt32 vault_bit = floorLog2(m_vault_num);
@@ -487,6 +527,7 @@ TODO:
 
 	model_delay += dram_delay;
 	model_delay += remap_delay;
+	model_delay += mem_access_delay;
 	/**/
 	Sim()->getStatsManager()->updateCurrentTime(pkt_time);
 
@@ -515,6 +556,7 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time)
 	UInt32 b_migrated_arr[32];
 	//m_dram_perf_model->checkStat(vault_i, bank_i);
 	m_dram_perf_model->checkDramValid(v_valid_arr, b_valid_arr, b_migrated_arr);
+	UInt32 writeback_blocks = 0, valid_blocks = 0;
 
 	for (UInt32 i = 0; i < 32; i++) {
 		UInt32 row_num = (1 << row_bit);
@@ -522,12 +564,13 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time)
 		UInt32 b_valid = b_valid_arr[i];
 		for (UInt32 bank_i = 0; bank_i < bank_num; bank_i++) {
 			if (((b_valid >> bank_i) & 1) == 0) {
-				#define INVALID_LOG
-				#ifdef INVALID_LOG
-				log_file << "INVALID BANK #" << i << "_" << bank_i << std::endl;
-				#endif
+				std::cout << "[ERROR] amazing, we found an invalid bank!" 
+						  << i << "_" << bank_i << ": " << b_valid << std::endl;
+				break;
+				UInt32 bank_valid_blocks = 0, bank_wb_blocks = 0;
 				for (UInt32 row_i = 0; row_i < row_num; row_i++) {
 					UInt32 set_i = bank_i << vault_bit << row_bit;
+					UInt32 set_valid_blocks = 0, set_wb_blocks = 0;
 					set_i |= (i << row_bit);
 					set_i |= row_i;
 					/* TODO: Here we need to invalidate or migrate (REMAP_MAN)
@@ -536,17 +579,32 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time)
 					 */
 					
 					if (remap_invalid) {
-						m_set[set_i]->invalidateContent();
+						set_wb_blocks = m_set[set_i]->invalidateContent();
+						bank_wb_blocks += set_wb_blocks;
 					} else {
-						dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::WRITE); 
-						dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 2048, set_i, DramCntlrInterface::READ); 
+						set_valid_blocks = m_set[set_i]->getValidBlocks();
+						bank_valid_blocks += set_valid_blocks;
 					}
+					/* Latency for migration */
+					dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE); 
+					/* Latency for invalidation */
+					dram_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * set_wb_blocks);
 				}
+				#define INVALID_LOG
+				#ifdef INVALID_LOG
+				log_file << "INVALID BANK #" << i << "_" << bank_i 
+						 << ", valid_blocks: " << bank_valid_blocks
+						 << ", wb blocks: " << bank_wb_blocks << std::endl;
+				#endif
+				valid_blocks += bank_valid_blocks;
+				writeback_blocks += bank_wb_blocks;
 			}
 		}
 	}
 	m_dram_perf_model->finishInvalidation();
 	//m_dram_perf_model->updateStats();
+
+	wb_blocks += writeback_blocks;
 	return dram_delay;
 }
 
@@ -559,7 +617,6 @@ StackDramCacheCntlrUnison::translateAddress(IntPtr address)
 	
 	if (page_table.find(v_tag) != page_table.end()) {
 		p_tag = page_table[v_tag];
-		//std::cout << "find a tag!" << std::endl;
 	} else {
 		page_table[v_tag] = avail_phy_page_tag;
 		p_tag = avail_phy_page_tag;
@@ -628,7 +685,7 @@ SubsecondTime
 DramPerfModelNormal::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf)
 {
 	SubsecondTime model_delay = SubsecondTime::Zero();
-	model_delay = m_dram_cache_cntlr->ProcessRequest(pkt_time, access_type, address);
+	model_delay += m_dram_cache_cntlr->ProcessRequest(pkt_time, access_type, address);
 
 	//printf("Normal Model# pkt_time: %ld, address: %ld\n", pkt_time.getMS(), address);
 	/*
@@ -646,7 +703,9 @@ DramPerfModelNormal::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
       return SubsecondTime::Zero();
    }
 
-   SubsecondTime access_latency =  model_delay;
+   SubsecondTime access_latency = model_delay;
+
+   //std::cout << "[OVERHEADS] Memory Request Latency: " << model_delay.getNS() << std::endl;
 
 
    perf->updateTime(pkt_time);
