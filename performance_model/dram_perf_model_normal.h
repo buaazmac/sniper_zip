@@ -162,8 +162,10 @@ class StackDramCacheCntlrUnison
 		StackDramCacheCntlrUnison(UInt32 set_num, UInt32 associativity, UInt32 blocksize, UInt32 pagesize);
 		~StackDramCacheCntlrUnison();
 
-		SubsecondTime ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::access_t access_type, IntPtr address);
-		SubsecondTime checkRemapping(SubsecondTime pkt_time);
+		SubsecondTime ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::access_t access_type, IntPtr address, ShmemPerf *perf);
+		SubsecondTime checkRemapping(SubsecondTime pkt_time, ShmemPerf *perf);
+
+		SubsecondTime handleDramAccess(SubsecondTime pkt_time, UInt32 pkt_size, UInt32 set_n, DramCntlrInterface::access_t access_type, ShmemPerf *perf);
 
 		/* Virtual-Physical Page Table*/
 		UInt32 avail_phy_page_tag;

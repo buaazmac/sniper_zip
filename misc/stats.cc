@@ -715,7 +715,7 @@ StatsManager::getDramBankTemp(UInt32 vault_num, UInt32 bank_num)
 void
 StatsManager::recordStats(String prefix)
 {
-	std::cout << "recordStats once" << std::endl;
+	std::cout << "recordStats once at " << m_current_time.getUS() << std::endl;
 
    LOG_ASSERT_ERROR(m_db, "m_db not yet set up !?");
 

@@ -7,12 +7,9 @@
 
 #include "dram_vault.h"
 
-#include "vault_remap.h"
+//#include "vault_remap.h"
 
-#include "bank_remap.h"
-
-#include "core.h"
-#include "dram_cntlr_interface.h"
+//#include "bank_remap.h"
 
 #include "fixed_types.h"
 
@@ -22,12 +19,10 @@
 #include "ramulator/dram_sim.h"
 #include "remapping.h"
 
-class VaultRemappingStructure;
-class BankRemappingStructure;
+//class VaultRemappingStructure;
+//class BankRemappingStructure;
 
 class RemappingManager;
-
-//class RemappingManager;
 
 class StackedDramPerfMem {
 	public:
@@ -58,7 +53,7 @@ class StackedDramPerfUnison {
 		SubsecondTime last_req = SubsecondTime::Zero();
 
 		/* structure for vault remapping*/
-		VaultRemappingStructure *m_vremap_table;
+		//VaultRemappingStructure *m_vremap_table;
 
 		/* Remapping Manager (REMAP_MAN)*/
 		RemappingManager* m_remap_manager;
@@ -127,7 +122,7 @@ class StackedDramPerfAlloy {
 		UInt32 m_row_size;
 
 		/* structure for vault remapping*/
-		VaultRemappingStructure *m_vremap_table;
+		//VaultRemappingStructure *m_vremap_table;
 		
 		VaultPerfModel** m_vaults_array;
 		std::ofstream log_file;

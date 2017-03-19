@@ -375,7 +375,7 @@ StackDramCacheCntlrUnison::~StackDramCacheCntlrUnison()
 }
 
 SubsecondTime
-StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::access_t access_type, IntPtr address)
+StackDramCacheCntlrUnison::ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::access_t access_type, IntPtr address, ShmemPerf *perf)
 {
 	SubsecondTime model_delay = SubsecondTime::Zero();
 	SubsecondTime dram_delay = SubsecondTime::Zero();
@@ -410,7 +410,7 @@ TODO:
 		mem_op_type = Core::READ;
 
 	/* Place to call remapping manager (REMAP_MAN) */
-	SubsecondTime remap_delay = checkRemapping(pkt_time);
+	SubsecondTime remap_delay = checkRemapping(pkt_time, perf);
 
 	/* Try to acccess cache set*/
 	UInt8 hit = m_set[set_n]->accessAttempt(mem_op_type, page_tag, page_offset);
@@ -422,7 +422,8 @@ TODO:
 	*/
 
 	// access tag need a read
-	dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, DramCntlrInterface::READ); 
+	//dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, DramCntlrInterface::READ); 
+	dram_delay += handleDramAccess(pkt_time, 64, set_n, DramCntlrInterface::READ, perf);
 
 	/* Here we record how many load/write to main memory after cache */
 	UInt32 load_blocks = 0, writeback_blocks = 0;
@@ -457,7 +458,8 @@ TODO:
 		m_set[set_n]->updateReplacementIndexTag(index, page_tag, pc, page_offset, footprint);
 
 		/* Write Back Dirty Blocks*/
-		dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64 * writeback_blocks, set_n, DramCntlrInterface::WRITE); 
+		//dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64 * writeback_blocks, set_n, DramCntlrInterface::WRITE); 
+		dram_delay += handleDramAccess(pkt_time, 64 * writeback_blocks, set_n, DramCntlrInterface::WRITE, perf); 
 		/* Load New Blocks from Memory*/
 
 		// calculate model delay (page load): load a page (1 page = 1984 B)
@@ -473,13 +475,15 @@ TODO:
 		// calculate model delay (block load): load a block
 	    //model_delay += m_dram_bandwidth.getRoundedLatency(64);
 	    //model_delay += m_dram_bandwidth.getRoundedLatency(64);
-		dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, DramCntlrInterface::WRITE); 
+		//dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, DramCntlrInterface::WRITE); 
+		dram_delay += handleDramAccess(pkt_time, 64, set_n, DramCntlrInterface::WRITE, perf); 
 
 		load_blocks ++;
 		//model_delay += m_dram_bandwidth.getRoundedLatency(8 * 64);
 	} 
 
-	dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, access_type); 
+	//dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, access_type); 
+	dram_delay += handleDramAccess(pkt_time, 64, set_n, access_type, perf); 
 
 	/* Here we update memory access delays*/
 	mem_access_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * load_blocks);
@@ -529,13 +533,13 @@ TODO:
 	model_delay += remap_delay;
 	model_delay += mem_access_delay;
 	/**/
-	Sim()->getStatsManager()->updateCurrentTime(pkt_time);
+	Sim()->getStatsManager()->updateCurrentTime(pkt_time + model_delay);
 
 	return model_delay;
 }
 
 SubsecondTime
-StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time)
+StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *perf)
 {
 	UInt32 vault_bit = floorLog2(m_vault_num);
 	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
@@ -547,7 +551,7 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time)
 	}
 
 	/* REMAP_DEBUG */
-	std::cout << "Here we found a remapping happened" << std::endl;
+	std::cout << "[REMAP_DEBUG] Here we found a remapping happened" << std::endl;
 
 	m_dram_perf_model->remapped = false;
 
@@ -586,7 +590,8 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time)
 						bank_valid_blocks += set_valid_blocks;
 					}
 					/* Latency for migration */
-					dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE); 
+					//dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE); 
+					dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE, perf); 
 					/* Latency for invalidation */
 					dram_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * set_wb_blocks);
 				}
@@ -601,11 +606,39 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time)
 			}
 		}
 	}
+	std::cout << "[REMAP_DEBUG] Here we complete a remapping" << std::endl;
 	m_dram_perf_model->finishInvalidation();
 	//m_dram_perf_model->updateStats();
 
 	wb_blocks += writeback_blocks;
 	return dram_delay;
+}
+
+SubsecondTime
+StackDramCacheCntlrUnison::handleDramAccess(SubsecondTime pkt_time, UInt32 pkt_size, UInt32 set_n, DramCntlrInterface::access_t access_type, ShmemPerf *perf) {
+	UInt32 bandwidth = 128;
+	int req_times = pkt_size / bandwidth;
+	if (req_times < 1) {
+		req_times = 1;
+	}
+	if (pkt_size == 0)
+		req_times = 0;
+
+	/*
+	std::cout << "[Handle Dram Access] " 
+			  << "pkt_time: " << pkt_time
+			  << ", pkt_size: " << pkt_size << std::endl;
+			  */
+
+	SubsecondTime delay = SubsecondTime::Zero();
+	while (req_times--) {
+		delay += m_dram_perf_model->getAccessLatency(pkt_time, 128, set_n, access_type); 
+
+		Sim()->getStatsManager()->updateCurrentTime(pkt_time + delay);
+		perf->updateTime(pkt_time, ShmemPerf::DRAM_QUEUE);
+		perf->updateTime(pkt_time + delay);
+	}
+	return delay;
 }
 
 IntPtr
@@ -684,8 +717,10 @@ DramPerfModelNormal::~DramPerfModelNormal()
 SubsecondTime
 DramPerfModelNormal::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf)
 {
+	//std::cout << "[DRAM_PERF_MODEL] before process a request\n";
 	SubsecondTime model_delay = SubsecondTime::Zero();
-	model_delay += m_dram_cache_cntlr->ProcessRequest(pkt_time, access_type, address);
+	model_delay += m_dram_cache_cntlr->ProcessRequest(pkt_time, access_type, address, perf);
+	//std::cout << "[DRAM_PERF_MODEL] after process a request\n";
 
 	//printf("Normal Model# pkt_time: %ld, address: %ld\n", pkt_time.getMS(), address);
 	/*
@@ -707,10 +742,10 @@ DramPerfModelNormal::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
 
    //std::cout << "[OVERHEADS] Memory Request Latency: " << model_delay.getNS() << std::endl;
 
-
    perf->updateTime(pkt_time);
-   perf->updateTime(pkt_time, ShmemPerf::DRAM_QUEUE);
-   perf->updateTime(pkt_time + access_latency);
+   perf->updateTime(pkt_time + model_delay, ShmemPerf::DRAM_QUEUE);
+   perf->updateTime(pkt_time + model_delay, ShmemPerf::DRAM_BUS);
+   perf->updateTime(pkt_time + model_delay, ShmemPerf::DRAM_DEVICE);
 
    // Update Memory Counters
    m_num_accesses ++;

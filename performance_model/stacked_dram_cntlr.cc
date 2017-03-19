@@ -126,7 +126,7 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 		m_vaults_array[i] = new VaultPerfModel(vault_size, bank_size, row_size);
 	}
 
-	m_vremap_table = new VaultRemappingStructure(vaults_num);
+	//m_vremap_table = new VaultRemappingStructure(vaults_num);
 	/* (REMAP_MAN) Remapping Managere, policy defined here*/
 	m_remap_manager = new RemappingManager(this, 1);
 	remapped = false;
@@ -194,7 +194,7 @@ StackedDramPerfUnison::~StackedDramPerfUnison()
 	log_file.close();
 
 	delete [] m_vaults_array;
-	delete m_vremap_table;
+	//delete m_vremap_table;
 	delete m_dram_model;
 	delete m_remap_manager;
 }
@@ -302,18 +302,19 @@ TODO: Here we need to handle memory request with physical index
 			stall = !m_dram_model->readRow(remapVault, remapBank, row_i, 0);
 			m_dram_model->tickOnce();
 			clks++;
+			/*
 			while (stall) {
-
-				//std::cout << "here is a stall!!" << std::endl;
 
 				stall = !m_dram_model->readRow(remapVault, remapBank, row_i, 0);
 				m_dram_model->tickOnce();
 				clks++;
 			}
+			*/
 		} else {
 			stall = !m_dram_model->writeRow(remapVault, remapBank, row_i, 0);
 			m_dram_model->tickOnce();
 			clks++;
+			/*
 			while (stall) {
 
 				//std::cout << "here is a stall!!" << std::endl;
@@ -322,11 +323,13 @@ TODO: Here we need to handle memory request with physical index
 				m_dram_model->tickOnce();
 				clks++;
 			}
+			*/
 		}
 		clks += m_dram_model->getReadLatency(remapVault);
 
 		UInt64 latency_ns = UInt64(m_dram_model->tCK) * clks;
 		process_latency += SubsecondTime::NS(latency_ns);
+
 		tot_clks += clks;
 	}
 #ifdef LOG_OUTPUT
@@ -336,6 +339,7 @@ TODO: Here we need to handle memory request with physical index
 			 << ", process_latency: " << process_latency.getNS()
 			 << std::endl;
 #endif
+	//process_latency = SubsecondTime::NS(2);
 	return process_latency;
 }
 
@@ -350,24 +354,19 @@ StackedDramPerfUnison::checkStat()
 {
 	/* here we check stats of DRAM and swap (REMAP_MAN)*/
 	std::cout << "[REMAP_MAN]Here we check DRAM stat to decide swap or not!" << std::endl;
-	bool remap = true;
+	bool remap = false;
+	UInt32 remap_times = 0;
 	
-	if (m_remap_manager->policy == 1 || m_remap_manager->policy == 3) {
-		for (UInt32 i = 0; i < n_vaults; i++) {
-			bool rst = m_remap_manager->checkStat(i, 0, remap);
+	for (UInt32 i = 0; i < n_vaults; i++) {
+		for (UInt32 j = 0; j < n_banks; j++) {
+			bool rst = m_remap_manager->checkStat(i, j, remap);
 			if (rst) {
-				v_remap_times ++;
+				b_remap_times ++;
+				remap_times ++;
+				if (remap_times > 10) break;
 			}
 		}
-	} else {
-		for (UInt32 i = 0; i < n_vaults; i++) {
-			for (UInt32 j = 0; j < n_banks; j++) {
-				bool rst = m_remap_manager->checkStat(i, j, remap);
-				if (rst) {
-					b_remap_times ++;
-				}
-			}
-		}
+		if (remap_times > 10) break;
 	}
 	remapped = true;
 }
@@ -427,7 +426,7 @@ StackedDramPerfUnison::updateStats()
 			  << "---remaining mem tick: " << memory_remaining_ticks
 			  << std::endl;
 	/* Tick Ramulator until queue empty*/
-	for (UInt32 i = 0; i < memory_remaining_ticks; i++) {
+	for (int i = 0; i < memory_remaining_ticks; i++) {
 		m_dram_model->tickOnce();
 	}
 	m_dram_model->resetIntervalTick();
@@ -499,7 +498,7 @@ StackedDramPerfAlloy::StackedDramPerfAlloy(UInt32 vaults_num, UInt32 vault_size,
 		m_vaults_array[i] = new VaultPerfModel(vault_size, bank_size, row_size);
 	}
 
-	m_vremap_table = new VaultRemappingStructure(vaults_num);
+	//m_vremap_table = new VaultRemappingStructure(vaults_num);
 }
 
 StackedDramPerfAlloy::~StackedDramPerfAlloy()
@@ -549,7 +548,7 @@ StackedDramPerfAlloy::~StackedDramPerfAlloy()
 	log_file.close();
 
 	delete [] m_vaults_array;
-	delete m_vremap_table;
+	//delete m_vremap_table;
 }
 
 SubsecondTime
@@ -574,29 +573,6 @@ StackedDramPerfAlloy::getAccessLatency(
 	UInt32 bank_i = set_i >> row_bit >> vault_bit; 
 	UInt32 row_i = set_i & ((1UL << row_bit) - 1);
 
-	/* Here we find out the remapping result*/
-
-	bool valid = true;
-	UInt32 remapVault = m_vremap_table->getVaultIdx(vault_i, &valid);
-
-	//debug
-#ifdef LOG_OUTPUT
-	log_file << "Set num: " << set_i 
-			  << ", vault_i: " << vault_i
-			  << ", bank_i: " << bank_i 
-			  << ", row_i: " << row_i 
-			  << "\n***remap vault: "
-			  << remapVault << std::endl;
-	if (remapVault != vault_i) {
-		log_file << "-----------not original map\n";
-	}
-#endif
-	/**/
-	
-	VaultPerfModel* vault = m_vaults_array[remapVault];
-
 	SubsecondTime process_latency = SubsecondTime::Zero();
-
-	process_latency += vault->processRequest(pkt_time, access_type, bank_i, row_i);
 	return process_latency;
 }
