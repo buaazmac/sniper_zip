@@ -390,6 +390,7 @@ StackedDramPerfUnison::tryRemapping()
 {
 	UInt32 remap_times = m_remap_manager->tryRemapping(true);
 	std::cout << "[REMAP_MAN] Here happens " << remap_times << " remaps!" << std::endl;
+	remapped = true;
 }
 
 void

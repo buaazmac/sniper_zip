@@ -5,7 +5,7 @@ RemappingTable::RemappingTable(UInt32 vaults, UInt32 banks, UInt32 rows) :
 	n_banks(banks),
 	n_rows(rows)
 {
-	n_entries = n_vaults * n_banks;
+	n_entries = n_vaults * n_banks * n_rows;
 	m_table = new struct remapping_entry[n_entries];
 	for (UInt32 i = 0; i < n_entries; i++) {
 		m_table[i].phy = m_table[i].log = i;
@@ -47,6 +47,7 @@ RemappingTable::remapBank(UInt32 src, UInt32 des, bool invalid)
 void
 RemappingTable::remapVault(UInt32 src, UInt32 des, bool invalid)
 {
+/*
 	UInt32 src_bank_0 = src * n_banks, des_bank_0 = des * n_banks;
 	UInt32 src_phy = m_table[src_bank_0].phy / n_banks,
 		des_log = m_table[des_bank_0].log / n_banks;
@@ -80,6 +81,7 @@ RemappingTable::remapVault(UInt32 src, UInt32 des, bool invalid)
 			m_table[des_bid].migrated = true;
 		}
 	}
+*/
 }
 
 UInt32
@@ -331,8 +333,17 @@ RemappingManager::findHottestRow()
 	UInt32 row_nums = n_vaults * n_banks * n_rows;
 	UInt32 hottest = INVALID_TARGET;
 	UInt32 max_access = m_stat_unit->row_access_threshold;
+
+	//std::cout << "Start finding hottest row!\n";
+
 	for (UInt32 i = 0; i < row_nums; i++) {
+
+		//std::cout << "checking: " << i << std::endl;
+
 		UInt32 log_idx = m_remap_table->getLogIdx(i);
+
+		//std::cout << "log_idx: " << log_idx << std::endl;
+
 		bool just_remapped = m_stat_unit->isJustRemapped(i),
 			 valid = m_remap_table->getValid(log_idx);
 		if (!valid || just_remapped) continue;
@@ -342,6 +353,9 @@ RemappingManager::findHottestRow()
 			hottest = i;
 		}
 	}
+	//std::cout << "Who is hottest? ..." << hottest << "!!\n";
+	if (hottest == INVALID_TARGET)
+		return INVALID_TARGET;
 	UInt32 src_idx = m_remap_table->getLogIdx(hottest);
 	return src_idx;
 }
@@ -392,7 +406,12 @@ RemappingManager::tryRemapping(bool remap)
 	if (remap == false) return 0;
 	int remap_times = 0;
 	while (remap_times < max_remap_times) {
+		//std::cout << "hehe\n";
 		UInt32 src = findHottestRow();
+		//std::cout << "haha\n";
+
+		/* Check if there is a hot row */
+		if (src == INVALID_TARGET) break;
 		UInt32 target = findTargetInVault(src);
 		if (target == INVALID_TARGET) {
 			target = findTargetCrossVault(src);
