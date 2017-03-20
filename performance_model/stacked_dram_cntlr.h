@@ -45,6 +45,7 @@ class StackedDramPerfUnison {
 	public:
 		UInt32 n_vaults;
 		UInt32 n_banks;
+		UInt32 n_rows;
 		UInt32 m_vault_size;
 		UInt32 m_bank_size;
 		UInt32 m_row_size;
@@ -99,12 +100,19 @@ TODO: we need to consider vault parrellelism
 		StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_size, UInt32 bank_size, UInt32 row_size);
 		~StackedDramPerfUnison();
 
+		void splitSetNum(UInt32 set_i, UInt32* vault_i, UInt32* bank_i, UInt32* row_i);
+		UInt32 getSetNum(UInt32 vault_i, UInt32 bank_i, UInt32 row_i);
 		SubsecondTime getAccessLatency(SubsecondTime pkt_time, UInt32 pkt_size, UInt32 set_i, DramCntlrInterface::access_t access_type);
+
+		bool checkRowValid(UInt32 vault_i, UInt32 bank_i, UInt32 row_i);
+		bool checkRowMigrated(UInt32 vault_i, UInt32 bank_i, UInt32 row_i);
 
 		void checkDramValid(bool *valid_arr, UInt32 *b_valid_arr, UInt32 *b_migrated_arr);
 		void checkTemperature(UInt32 idx, UInt32 bank_i);
 		/* check stats and remap (REMAP_MAN)*/
 		void checkStat();
+		void tryRemapping();
+
 		void finishInvalidation();
 		void updateStats();
 		void clearCacheStats();

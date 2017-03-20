@@ -544,6 +544,9 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 	UInt32 vault_bit = floorLog2(m_vault_num);
 	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
 	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
+	UInt32 row_num = (1 << row_bit);
+	UInt32 bank_num = (1 << bank_bit);
+	UInt32 vault_num = m_vault_num;
 
 	SubsecondTime dram_delay = SubsecondTime::Zero();
 	if (m_dram_perf_model->remapped == false) {
@@ -555,54 +558,39 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 
 	m_dram_perf_model->remapped = false;
 
-	bool v_valid_arr[32];
-	UInt32 b_valid_arr[32];
-	UInt32 b_migrated_arr[32];
 	//m_dram_perf_model->checkStat(vault_i, bank_i);
-	m_dram_perf_model->checkDramValid(v_valid_arr, b_valid_arr, b_migrated_arr);
+	//m_dram_perf_model->checkDramValid(v_valid_arr, b_valid_arr, b_migrated_arr);
 	UInt32 writeback_blocks = 0, valid_blocks = 0;
 
-	for (UInt32 i = 0; i < 32; i++) {
-		UInt32 row_num = (1 << row_bit);
-		UInt32 bank_num = (1 << bank_bit);
-		UInt32 b_valid = b_valid_arr[i];
+	for (UInt32 vault_i = 0; vault_i < vault_num; vault_i++) {
 		for (UInt32 bank_i = 0; bank_i < bank_num; bank_i++) {
-			if (((b_valid >> bank_i) & 1) == 0) {
-				std::cout << "[ERROR] amazing, we found an invalid bank!" 
-						  << i << "_" << bank_i << ": " << b_valid << std::endl;
-				break;
-				UInt32 bank_valid_blocks = 0, bank_wb_blocks = 0;
-				for (UInt32 row_i = 0; row_i < row_num; row_i++) {
-					UInt32 set_i = bank_i << vault_bit << row_bit;
-					UInt32 set_valid_blocks = 0, set_wb_blocks = 0;
-					set_i |= (i << row_bit);
-					set_i |= row_i;
-					/* TODO: Here we need to invalidate or migrate (REMAP_MAN)
-					 * We can use m_set[set_i]->calculateUsedBlock()
-					 * to reduce invalidation/migration overhead.
-					 */
-					
-					if (remap_invalid) {
-						set_wb_blocks = m_set[set_i]->invalidateContent();
-						bank_wb_blocks += set_wb_blocks;
-					} else {
-						set_valid_blocks = m_set[set_i]->getValidBlocks();
-						bank_valid_blocks += set_valid_blocks;
-					}
-					/* Latency for migration */
-					//dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE); 
-					dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE, perf); 
-					/* Latency for invalidation */
-					dram_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * set_wb_blocks);
+			for (UInt32 row_i = 0; row_i < row_num; row_i++) {
+				UInt32 row_valid_blocks = 0, row_wb_blocks = 0;
+				bool valid = m_dram_perf_model->checkRowValid(vault_i, bank_i, row_i),
+					 migrated = m_dram_perf_model->checkRowMigrated(vault_i, bank_i, row_i);
+				if (valid && !migrated) continue;
+
+				UInt32 set_valid_blocks = 0, set_wb_blocks = 0;
+				UInt32 set_i = m_dram_perf_model->getSetNum(vault_i, bank_i, row_i);
+				if (!valid) {
+					set_wb_blocks = m_set[set_i]->invalidateContent();
+					row_wb_blocks += set_wb_blocks;
+				} else {
+					set_valid_blocks = m_set[set_i]->getValidBlocks();
+					row_valid_blocks += set_valid_blocks;
 				}
-				#define INVALID_LOG
-				#ifdef INVALID_LOG
-				log_file << "INVALID BANK #" << i << "_" << bank_i 
-						 << ", valid_blocks: " << bank_valid_blocks
-						 << ", wb blocks: " << bank_wb_blocks << std::endl;
-				#endif
-				valid_blocks += bank_valid_blocks;
-				writeback_blocks += bank_wb_blocks;
+				/* Latency for migration */
+				dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE, perf); 
+				/* Latency for invalidation */
+				dram_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * set_wb_blocks);
+
+				std::cout << "[REMAP_DEBUG] Amazing, we found an invalid row!\n"
+					      << "------wb_blocks: " << set_wb_blocks
+						  << "------valid blocks: " << set_valid_blocks
+						  << std::endl;
+				
+				valid_blocks += row_valid_blocks;
+				writeback_blocks += row_wb_blocks;
 			}
 		}
 	}

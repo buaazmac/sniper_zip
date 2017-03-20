@@ -743,7 +743,8 @@ StatsManager::recordStats(String prefix)
    callHotSpot();
 
    /* (REMAP_MAN) decide whether to remap*/
-   m_stacked_dram_unison->checkStat();
+   //m_stacked_dram_unison->checkStat();
+   m_stacked_dram_unison->tryRemapping();
 
    /* Dump power trace during runtime*/
    //dumpDramPowerTrace();

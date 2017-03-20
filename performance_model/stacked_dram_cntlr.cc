@@ -121,6 +121,8 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 
 	n_banks = m_vault_size / m_bank_size;
 
+	n_rows = m_bank_size / m_row_size;
+
 	m_vaults_array = new VaultPerfModel*[n_vaults];
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		m_vaults_array[i] = new VaultPerfModel(vault_size, bank_size, row_size);
@@ -199,6 +201,30 @@ StackedDramPerfUnison::~StackedDramPerfUnison()
 	delete m_remap_manager;
 }
 
+void 
+StackedDramPerfUnison::splitSetNum(UInt32 set_i, UInt32* vault_i, UInt32* bank_i, UInt32* row_i)
+{
+	UInt32 vault_bit = floorLog2(n_vaults);
+	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
+	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
+
+	*vault_i = (set_i >> row_bit) & ((1UL << vault_bit) - 1);
+	*bank_i = set_i >> row_bit >> vault_bit; 
+	*row_i = set_i & ((1UL << row_bit) - 1);
+}
+UInt32 
+StackedDramPerfUnison::getSetNum(UInt32 vault_i, UInt32 bank_i, UInt32 row_i)
+{
+	UInt32 vault_bit = floorLog2(n_vaults);
+	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
+	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
+
+	UInt32 set_i = bank_i << vault_bit << row_bit;
+	set_i |= (vault_i << row_bit);
+	set_i |= (row_i);
+	return set_i;
+}
+
 SubsecondTime
 StackedDramPerfUnison::getAccessLatency(
 						SubsecondTime pkt_time, 
@@ -213,13 +239,23 @@ StackedDramPerfUnison::getAccessLatency(
 		req_times = 1;
 	}
 
+	/*
 	UInt32 vault_bit = floorLog2(n_vaults);
 	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
 	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
+	*/
 
+	UInt32 vault_i = 0, bank_i = 0, row_i = 0;
+	splitSetNum(set_i, &vault_i, &bank_i, &row_i);
+	UInt32 ss = getSetNum(vault_i, bank_i, row_i);
+	if (ss != set_i) {
+		std::cout << "[ERROR] HooHoo, there is a problem with set number!\n";
+	}
+	/*
 	UInt32 vault_i = (set_i >> row_bit) & ((1UL << vault_bit) - 1);
 	UInt32 bank_i = set_i >> row_bit >> vault_bit; 
 	UInt32 row_i = set_i & ((1UL << row_bit) - 1);
+	*/
 
 	/* Here we find out the remapping result*/
 
@@ -229,8 +265,8 @@ StackedDramPerfUnison::getAccessLatency(
 	// Handle an access in remapping
 	//m_vremap_table->accessOnce(vault_i, bank_i, access_type, pkt_time);
 	/* REMAP_MAN*/
-	UInt32 remapVault = vault_i, remapBank = bank_i;
-	bool valid_bit = m_remap_manager->getPhysicalIndex(&remapVault, &remapBank);
+	UInt32 remapVault = vault_i, remapBank = bank_i, remapRow = row_i;
+	bool valid_bit = m_remap_manager->getPhysicalIndex(&remapVault, &remapBank, &remapRow);
 
 	//debug
 #ifdef LOG_OUTPUT
@@ -284,7 +320,7 @@ StackedDramPerfUnison::getAccessLatency(
 TODO: Here we need to handle memory request with physical index
 	   */
 	/* (REMAP_MAN) Here we update statistics store unit*/
-	m_remap_manager->accessRow(remapVault, remapBank, row_i, req_times);
+	m_remap_manager->accessRow(remapVault, remapBank, remapRow, req_times);
 
 	/* STAT_DEBUG */
 	if (access_type == DramCntlrInterface::READ) {
@@ -350,6 +386,13 @@ StackedDramPerfUnison::checkTemperature(UInt32 vault_i, UInt32 bank_i)
 }
 
 void
+StackedDramPerfUnison::tryRemapping()
+{
+	UInt32 remap_times = m_remap_manager->tryRemapping(true);
+	std::cout << "[REMAP_MAN] Here happens " << remap_times << " remaps!" << std::endl;
+}
+
+void
 StackedDramPerfUnison::checkStat()
 {
 	/* here we check stats of DRAM and swap (REMAP_MAN)*/
@@ -371,42 +414,21 @@ StackedDramPerfUnison::checkStat()
 	remapped = true;
 }
 
+bool
+StackedDramPerfUnison::checkRowValid(UInt32 vault_i, UInt32 bank_i, UInt32 row_i)
+{
+	return m_remap_manager->checkValid(vault_i, bank_i, row_i);
+}
+
+bool 
+StackedDramPerfUnison::checkRowMigrated(UInt32 vault_i, UInt32 bank_i, UInt32 row_i)
+{
+	return m_remap_manager->checkMigrated(vault_i, bank_i, row_i);
+}
+
 void
 StackedDramPerfUnison::checkDramValid(bool *valid_arr, UInt32* b_valid_arr, UInt32* b_migrated_arr)
 {
-	//log_file << "[REMAP_CHECK] Here we start to check valid bit: ";
-
-	for (int i = 0; i < n_vaults; i++) {
-		UInt32 bank_valid = 0, bank_migrated = 0;
-		//bool vault_valid = m_vremap_table->isValid(i, &bank_valid);
-		bool vault_valid = true;
-		for (int j = n_banks - 1; j >= 0; j--) {
-			UInt32 vault_i = i, bank_i = j;
-			bool valid = m_remap_manager->getPhysicalIndex(&vault_i, &bank_i);
-			bool migrated = m_remap_manager->checkMigrated(i, j);
-			if (valid) {
-				bank_valid |= 1;
-
-				//log_file << i << "_" << j << "(" << vault_i << ")-invalid, " << bank_i;
-			}
-			if (migrated) {
-				bank_migrated |= 1;
-
-				//log_file << i << "_" << j << "(" << vault_i << ")-migrated, " << bank_i;
-			}
-			if (j > 0) {
-				bank_valid <<= 1;
-				bank_migrated <<= 1;
-			}
-		}
-		if (vault_valid) {
-			valid_arr[i] = true;
-		} else {
-			valid_arr[i] = false;
-		}
-		b_valid_arr[i] = bank_valid;
-		b_migrated_arr[i] = bank_migrated;
-	}
 }
 
 void
@@ -479,7 +501,7 @@ StackedDramPerfUnison::clearCacheStats()
 void
 StackedDramPerfUnison::updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp)
 {
-	m_remap_manager->updateTemperature(v, b, temperature, v_temp);
+	m_remap_manager->updateTemperature(v, v_temp);
 }
 
 //-------------------------------------ALLOY-------------------------
