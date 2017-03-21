@@ -134,6 +134,7 @@ class StatsManager
 	  double vault_power[32];
 	  double power_L3;
 	  double power_exe[4], power_ifetch[4], power_lsu[4], power_mmu[4], power_l2[4], power_ru[4];
+	  int hot_access[32][8], cool_access[32][8];
 	  
 	  /*Temperature data*/
 	  int unit_num;

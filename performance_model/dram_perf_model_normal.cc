@@ -335,11 +335,6 @@ StackDramCacheCntlrUnison::StackDramCacheCntlrUnison(
 
 StackDramCacheCntlrUnison::~StackDramCacheCntlrUnison()
 {
-	std::cout << "---deleting dram cache controller from NORMAL model" << std::endl;
-
-	std::ofstream stat_file;
-	stat_file.open("BasicStatistics.txt");
-
 	float miss_rate;
 	UInt32 tot_miss = page_misses + block_misses;
 
@@ -348,14 +343,15 @@ StackDramCacheCntlrUnison::~StackDramCacheCntlrUnison()
 	else
 		miss_rate = 0;
 
-	stat_file << "[EXTRA OUTPUT] DRAM Total Access: " << cache_access 
+	std::cout << "\n ***** [DRAM_CACHE_Result] *****\n\n";
+	std::cout << "*** DRAM Total Access: " << cache_access 
 			  << ", miss: " << tot_miss << ", miss rate: " << miss_rate 
 			  << std::endl;
-	stat_file << "[EXTRA OUTPUT] DRAM Remap Times: " 
+	std::cout << "*** DRAM Remap Times: " 
 			  << m_dram_perf_model->v_remap_times << " vault remaps, "
 			  << m_dram_perf_model->b_remap_times << " bank remaps."
 			  << std::endl;
-	stat_file << "[EXTRA OUTPUT] DRAM Statistics: " 
+	std::cout << "*** DRAM Statistics: " 
 			  << m_dram_perf_model->tot_dram_reads << " reads, "
 			  << m_dram_perf_model->tot_dram_writes << " writes, "
 			  << m_dram_perf_model->tot_row_hits << " row hits, "
@@ -364,8 +360,7 @@ StackDramCacheCntlrUnison::~StackDramCacheCntlrUnison()
 			  << m_dram_perf_model->tot_rd_t.getUS() << " RD time, "
 			  << m_dram_perf_model->tot_wr_t.getUS() << " WR time."
 			  << std::endl;
-
-	stat_file.close();
+	std::cout << "\n ***** [DRAM_CACHE_Result] *****\n\n";
 
 	log_file.close();
 	delete m_set_info;

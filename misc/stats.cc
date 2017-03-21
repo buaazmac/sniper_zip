@@ -76,6 +76,22 @@ StatsManager::~StatsManager()
       sqlite3_finalize(m_stmt_insert_value);
       sqlite3_close(m_db);
    }
+
+   /* Dump Refresh/Access Results*/
+   std::cout << "\n ***** [REF/AC_Result] *****\n";
+   int tot_hot_access = 0, tot_cool_access = 0;
+   for (int i = 0; i < 32; i++) {
+	   for (int j = 0; j < 8; j++) {
+		   std::cout << "/*BANK*/" << i << "->" << j
+					 << ": cool access (" << cool_access[i][j] << "), "
+					 << "hot access (" << hot_access[i][j] << ")." << std::endl;
+		   tot_hot_access += hot_access[i][j];
+		   tot_cool_access += cool_access[i][j];
+	   }
+   }
+   std::cout << "{Summary}: " << tot_hot_access << " Hot Accesses, "
+			 << tot_cool_access << " Cool Accesses." << std::endl;
+   std::cout << "\n ***** [REF/AC_Result] *****\n";
 	
 }
 
@@ -170,6 +186,9 @@ StatsManager::init()
 		   bank_stats[i][j].reads = 0;
 		   bank_stats[i][j].writes = 0;
 		   bank_stats[i][j].row_hits = 0;
+
+		   hot_access[i][j] = 0;
+		   cool_access[i][j] = 0;
 	   }
    }
    /*Initialize current time*/
@@ -716,6 +735,11 @@ StatsManager::callHotSpot()
 			 */
 			int vault_temp = int(unit_temp[25 + v_i]);
 			m_stacked_dram_unison->updateTemperature(v_i, b_i, unit_temp[i], vault_temp);
+			if (unit_temp[i] > 85) {
+				hot_access[v_i][b_i] += tmp->reads + tmp->writes;
+			} else {
+				cool_access[v_i][b_i] += tmp->reads + tmp->writes;
+			}
 		}
 		temp_trace_log << std::endl;
 	}
