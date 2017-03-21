@@ -389,7 +389,7 @@ void
 StackedDramPerfUnison::tryRemapping()
 {
 	UInt32 remap_times = m_remap_manager->tryRemapping(true);
-	std::cout << "[REMAP_MAN] Here happens " << remap_times << " remaps!" << std::endl;
+	//std::cout << "[REMAP_MAN] Here happens " << remap_times << " remaps!" << std::endl;
 	remapped = true;
 }
 
@@ -397,7 +397,7 @@ void
 StackedDramPerfUnison::checkStat()
 {
 	/* here we check stats of DRAM and swap (REMAP_MAN)*/
-	std::cout << "[REMAP_MAN]Here we check DRAM stat to decide swap or not!" << std::endl;
+	//std::cout << "[REMAP_MAN]Here we check DRAM stat to decide swap or not!" << std::endl;
 	bool remap = false;
 	UInt32 remap_times = 0;
 	
@@ -443,11 +443,13 @@ StackedDramPerfUnison::updateStats()
 {
 	/* STAT_DEBUG*/
 	int memory_remaining_ticks = m_dram_model->interval_ticks;
+	/*
 	std::cout << "[update stats]------------" << std::endl;
 	std::cout << "---tot_reads: " << tot_reads
 			  << "---tot_writes: " << tot_writes
 			  << "---remaining mem tick: " << memory_remaining_ticks
 			  << std::endl;
+	*/
 	/* Tick Ramulator until queue empty*/
 	for (int i = 0; i < memory_remaining_ticks; i++) {
 		m_dram_model->tickOnce();
@@ -464,12 +466,14 @@ StackedDramPerfUnison::updateStats()
 		UInt32 serv_wr = m_dram_model->getServingWrReq(i);
 
 	/* STAT_DEBUG*/
+		/*
 		std::cout << "vault_" << i << "-> "
 				  << "reads: " << vault->stats.reads
 				  << ", writes: " << vault->stats.writes
 				  << ", serving_reads: " << serv_rd
 				  << ", serving_writes: " << serv_wr
 				  << std::endl;
+				  */
 
 		tot_dram_reads += vault->stats.reads;
 		tot_dram_writes += vault->stats.writes;

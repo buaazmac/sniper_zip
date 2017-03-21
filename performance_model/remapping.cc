@@ -418,8 +418,8 @@ RemappingManager::tryRemapping(bool remap)
 		}
 		if (src == INVALID_TARGET || target == INVALID_TARGET)
 			break;
-		std::cout << "[REMAP_DEBUG] Find a hot row and prepare remapping!\n"
-				  << "---src: " << src << "---target: " << target << std::endl;
+		//std::cout << "[REMAP_DEBUG] Find a hot row and prepare remapping!\n"
+		//		  << "---src: " << src << "---target: " << target << std::endl;
 		issueRowRemap(src, target);
 		remap_times ++;
 	}

@@ -120,6 +120,11 @@ class StatsManager
 	  std::ofstream dram_stats_file;
 	  /*Record the previous statistics*/
 	  SubsecondTime m_current_time;
+	  SubsecondTime m_last_record_time;
+	  SubsecondTime m_record_interval;
+
+	  bool first_ttrace;
+
 	  struct BankStatEntry bank_stats[32][8];
 	  UInt64 vault_reads[32], vault_writes[32], vault_row_hits[32];
 	  BankStatEntry bank_stats_interval[32][8];

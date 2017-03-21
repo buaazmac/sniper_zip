@@ -42,7 +42,7 @@ def power2up(num):
 
 def compute_dram_power(nread, nwrite, t, config):
 
-  print '[dram power computation] %d, %d, %f' % (nread, nwrite, t)
+#print '[dram power computation] %d, %d, %f' % (nread, nwrite, t)
 
   num_dram_controllers = int(config['perf_model/dram/num_controllers'])
   if num_dram_controllers > 0:

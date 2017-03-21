@@ -320,10 +320,11 @@ Hotspot::initHotSpot(int argc, char **argv)
 
 /*
  * implementation of calculateTemperature
-*/
+ */
 void
 Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
 {
+	//printf("*[HotSpot] Here we begin calculate\n");
   int i, j, idx, base = 0, count = 0, n = 0;
   int num, size, lines = 0, do_transient = TRUE;
   char **names;
@@ -437,6 +438,8 @@ Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
   power = hotspot_vector(model);
   steady_temp = hotspot_vector(model);
   overall_power = hotspot_vector(model);
+
+	//printf("*[HotSpot] Here we finish configuration\n");
 
   /* set up initial instantaneous temperatures */
   if (do_transient && strcmp(model->config->init_file, NULLFILE)) {
@@ -617,6 +620,7 @@ Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
         }	
     }
   }
+	//printf("*[HotSpot] Here we end calculate\n");
 
   /* cleanup	*/
   fclose(pin);

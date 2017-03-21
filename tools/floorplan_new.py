@@ -3,7 +3,16 @@
 import os, sys, math, re, collections, buildstack, gnuplot, getopt, pprint, sniper_lib, sniper_config, sniper_stats
 import math
 
-area = {'core': {'exe': (6.00e-3, 2.00e-3),
+area = {'core': {'exe': (4.00e-3, 2.00e-3),
+				 'ifetch': (3.00e-3, 2.00e-3),
+				 'lsu': (3.00e-3, 3.00e-3),
+				 'mmu': (1.00e-3, 1.00e-3),
+				 'l2': (5.00e-3, 1.00e-3),
+				 'ru': (1.00e-3, 1.00e-3)},
+		'L3': (12.00e-3, 4.00e-3),
+		'dram': (12.00e-3, 16.00e-3)}
+
+boarder = {'core': {'exe': (6.00e-3, 2.00e-3),
 				 'ifetch': (3.00e-3, 2.00e-3),
 				 'lsu': (3.00e-3, 3.00e-3),
 				 'mmu': (1.00e-3, 1.00e-3),
@@ -67,23 +76,24 @@ def draw_l3(flrfile, x, y):
 def draw_core(flrfile, x, y, coreid):
 	with file(flrfile, 'a') as f:
 		cu = area['core']
+		bd = boarder['core']
 
 		xx = 0
-		yy = 6.00e-3 - float(cu['exe'][1])
+		yy = 6.00e-3 - float(bd['exe'][1])
 		line = 'exe_%d\t%f\t%f\t%f\t%f\n' % \
 			   (coreid, float(cu['exe'][0]), float(cu['exe'][1]),\
 				float(x + xx), float(y + yy))
 		f.write(line)
 		
 		xx = 0
-		yy = 6.00e-3 - float(cu['exe'][1]) - float(cu['lsu'][1])
+		yy = 6.00e-3 - float(bd['exe'][1]) - float(bd['lsu'][1])
 		line = 'ifetch_%d\t%f\t%f\t%f\t%f\n' % \
 			   (coreid, float(cu['ifetch'][0]), float(cu['ifetch'][1]),\
 				float(x + xx), float(y + yy))
 		f.write(line)
 
-		xx = float(cu['ifetch'][0])
-		yy = 6.00e-3 - float(cu['exe'][1]) - float(cu['lsu'][1])
+		xx = float(bd['ifetch'][0])
+		yy = 6.00e-3 - float(bd['exe'][1]) - float(bd['lsu'][1])
 		line = 'lsu_%d\t%f\t%f\t%f\t%f\n' % \
 			   (coreid, float(cu['lsu'][0]), float(cu['lsu'][1]),\
 				float(x + xx), float(y + yy))
@@ -96,15 +106,15 @@ def draw_core(flrfile, x, y, coreid):
 				float(x + xx), float(y + yy))
 		f.write(line)
 
-		xx = float(cu['mmu'][0])
-		yy = 6.00e-3 - float(cu['exe'][1]) - float(cu['lsu'][1]) - float(cu['l2'][1])
+		xx = float(bd['mmu'][0])
+		yy = 6.00e-3 - float(bd['exe'][1]) - float(bd['lsu'][1]) - float(bd['l2'][1])
 		line = 'l2_%d\t%f\t%f\t%f\t%f\n' % \
 			   (coreid, float(cu['l2'][0]), float(cu['l2'][1]),\
 				float(x + xx), float(y + yy))
 		f.write(line)
 
 		xx = 0
-		yy = 6.00e-3 - float(cu['exe'][1]) - float(cu['ru'][1])
+		yy = 6.00e-3 - float(bd['exe'][1]) - float(bd['ru'][1])
 		line = 'ru_%d\t%f\t%f\t%f\t%f\n' % \
 			   (coreid, float(cu['ru'][0]), float(cu['ru'][1]),\
 				float(x + xx), float(y + yy))

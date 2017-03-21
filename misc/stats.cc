@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <string>
 #include <cstring>
+#include <cstdio>
 #include <zlib.h>
 #include <sys/time.h>
 
@@ -173,6 +174,10 @@ StatsManager::init()
    }
    /*Initialize current time*/
    m_current_time = SubsecondTime::Zero();
+   m_last_record_time = SubsecondTime::Zero();
+   m_record_interval = SubsecondTime::Zero();
+
+   first_ttrace = false;
 
 	/*End Init*/
 	printf("----------END_INIT_STATS_MANAGER------------\n");
@@ -428,12 +433,55 @@ StatsManager::updateBankStat(int i, int j, BankPerfModel* bank)
 void
 StatsManager::dumpHotspotInput()
 {
-	std::cout << "[STAT_DEBUG] Begin Dumping HotspotInput\n" << std::endl;
+	//std::cout << "[STAT_DEBUG] Begin Dumping HotspotInput\n" << std::endl;
 	/* Here we dump input for hotspot
 	 * init_file(tmp.steady) from last time
 	 * -p powertrace.input
 	 */
+/* Write down power trace*/
+	std::ofstream pt_file;
+	pt_file.open("./HotSpot/powertrace.input");
+	pt_file << "L3";
+	for (int i = 0; i < 4; i++) {
+		pt_file << "\texe_" << i;
+		pt_file << "\tifetch_" << i;
+		pt_file << "\tlsu_" << i;
+		pt_file << "\tmmu_" << i;
+		pt_file << "\tl2_" << i;
+		pt_file << "\tru_" << i;
+	}
+	for (int i = 0; i < 32; i++) {
+		pt_file << "\tdram_ctlr_" << i;
+	}
+	for (int j = 0; j < 8; j++) {
+		for (int i = 0; i < 32; i++) {
+			pt_file << "\tdram_" << i << "_" << j;
+		}
+	}
+	pt_file << std::endl;
+	/* We first write down the last power trace*/
+	for (int pt = 0; pt < 1; pt ++) {
+		pt_file << power_L3;
+
+		for (int i = 0; i < 4; i++) {
+			pt_file << "\t" << power_exe[i] << "\t" << power_ifetch[i] 
+					<< "\t" << power_lsu[i] << "\t" << power_mmu[i]
+					<< "\t" << power_l2[i] << "\t" << power_ru[i];
+		}
+		for (int i = 0; i < 32; i++) {
+			pt_file << "\t" << vault_power[i];
+		}
+		for (int j = 0; j < 8; j++) {
+			for (int i =0; i < 32; i++) {
+				pt_file << "\t" << bank_power[i][j];
+			}
+		}
+		pt_file << std::endl;
+	}
 //for (int pt_it = 0; pt_it < 2; pt_it++) {
+	/*
+		Here we update power statistics!
+	 */
 	power_L3 = double(getMetricObject("L3", 0, "power-dynamic")->recordMetric()) * 1.0e-6;
 	//pt_file << power_L3;
 	for (int i = 0; i < 4; i++) {
@@ -446,7 +494,7 @@ StatsManager::dumpHotspotInput()
 	}
 
 	/* Set of time interval*/
-	SubsecondTime tot_time = SubsecondTime::MS(1);
+	SubsecondTime tot_time = m_record_interval;
 
 	UInt32 n_banks = 8;
 	UInt32 n_vaults = m_stacked_dram_unison->n_vaults;
@@ -459,6 +507,7 @@ StatsManager::dumpHotspotInput()
 	   //test_file << "-----------OUTPUT_DATA-----------------" << std::endl;
 
 		for (UInt32 i = 0; i < m_stacked_dram_unison->n_vaults; i++) {
+			double std_power = 0;
 			VaultPerfModel* vault = m_stacked_dram_unison->m_vaults_array[i];
 			n_banks = vault->n_banks;
 
@@ -495,6 +544,8 @@ StatsManager::dumpHotspotInput()
 					page_hit_rate = double(tot_row_hits) / double(tot_reads + tot_writes);
 				}
 				bank_power[i][j] = computeDramPower(tmp->tACT, tmp->tPRE, tmp->tRD, tmp->tWR, tot_time, tmp->reads, tmp->writes, page_hit_rate);
+				std_power += bank_power[i][j];
+
 
 				/*
 				test_file << "bank_" << i << "_" << j
@@ -512,7 +563,7 @@ StatsManager::dumpHotspotInput()
 				//tot_reads += tmp->reads;
 				//tot_writes += tmp->writes;
 			}
-			vault_power[i] = computeDramCntlrPower(tot_reads, tot_writes, tot_time);
+			vault_power[i] = std_power + computeDramCntlrPower(tot_reads, tot_writes, tot_time);
 			vault_access[i] = tot_reads + tot_writes;
 
 			/*
@@ -525,33 +576,13 @@ StatsManager::dumpHotspotInput()
 		}
    }
 
-/* Write down power trace*/
-	std::ofstream pt_file;
-	pt_file.open("./HotSpot/powertrace.input");
-	pt_file << "L3";
-	for (int i = 0; i < 4; i++) {
-		pt_file << "\texe_" << i;
-		pt_file << "\tifetch_" << i;
-		pt_file << "\tlsu_" << i;
-		pt_file << "\tmmu_" << i;
-		pt_file << "\tl2_" << i;
-		pt_file << "\tru_" << i;
-	}
-	for (int i = 0; i < 32; i++) {
-		pt_file << "\tdram_ctlr_" << i;
-	}
-	for (int j = 0; j < 8; j++) {
-		for (int i = 0; i < 32; i++) {
-			pt_file << "\tdram_" << i << "_" << j;
-		}
-	}
-	pt_file << std::endl;
 
 /*
    Here we can choose to measure the results of 2.5D model
    In which, we turn off the power of CPU components
  */
 #ifdef __ONLY_DRAM__
+	/*
 	power_L3 = 0;
 	for (int i = 0; i < 4; i++) {
 		power_exe[i] = 0;
@@ -561,10 +592,11 @@ StatsManager::dumpHotspotInput()
 		power_l2[i] = 0;
 		power_ru[i] = 0;
 	}
+	*/
 #endif
 
 
-	for (int pt = 0; pt < 2; pt ++) {
+	for (int pt = 0; pt < 1; pt ++) {
 		pt_file << power_L3;
 
 		for (int i = 0; i < 4; i++) {
@@ -585,30 +617,43 @@ StatsManager::dumpHotspotInput()
 
 	pt_file.close();
 	//test_file.close();
-	std::cout << "[STAT_DEBUG] End Dumping HotspotInput" << std::endl;
+	//std::cout << "[STAT_DEBUG] End Dumping HotspotInput" << std::endl;
 }
 
 void
 StatsManager::callHotSpot()
 {
-	std::cout << "[STAT_DEBUG] Begin Calling HotSpot" << std::endl;
+	//std::cout << "[STAT_DEBUG] Begin Calling HotSpot" << std::endl;
 #pragma GCC diagnostic ignored "-Wwrite-strings"
-	char *argv[15];
-	/*First run to get steady states*/
-	argv[1] = "-c";
-	argv[2] = "./HotSpot/hotspot.config";
-  	argv[3] = "-steady_file";
-  	argv[4] = "./HotSpot/tmp.steady";
-  	argv[5] = "-f";
-  	argv[6] = "./HotSpot/core_layer.flr";
-  	argv[7] = "-p";
-  	argv[8] = "./HotSpot/powertrace.input";
-  	argv[9] = "-model_type";
-  	argv[10] = "grid";
-  	argv[11] = "-grid_layer_file";
-  	argv[12] = "./HotSpot/test_3D.lcf";
+	char *argv[17];
+	if (first_ttrace == false) {
+		first_ttrace = true;
+		/*First run to get steady states*/
+		argv[1] = "-c";
+		argv[2] = "./HotSpot/hotspot.config";
+		argv[3] = "-steady_file";
+		argv[4] = "./HotSpot/tmp.steady";
+		argv[5] = "-f";
+		argv[6] = "./HotSpot/core_layer.flr";
+		argv[7] = "-p";
+		argv[8] = "./HotSpot/powertrace.input";
+		argv[9] = "-model_type";
+		argv[10] = "grid";
+		argv[11] = "-grid_layer_file";
+		argv[12] = "./HotSpot/test_3D.lcf";
 
-  	hotspot->calculateTemperature(unit_temp, 13, argv);
+		hotspot->calculateTemperature(unit_temp, 13, argv);
+	} else {
+		int rename_rst;
+		char old_name[] = "./HotSpot/tmp.steady.new";
+		char new_name[] = "./HotSpot/tmp.steady";
+		rename_rst = rename(old_name, new_name);
+		if (rename_rst == 0) {
+			//std::cout << "[Steady File Rename] Success!\n";
+		} else {
+			//std::cout << "[Steady File Rename] Failed!\n";
+		}
+	}
 
 	/*Second run to get final output*/
 	argv[1] = "-c";
@@ -625,8 +670,10 @@ StatsManager::callHotSpot()
   	argv[12] = "grid";
   	argv[13] = "-grid_layer_file";
   	argv[14] = "./HotSpot/test_3D.lcf";
+	argv[15] = "-steady_file";
+	argv[16] = "./HotSpot/tmp.steady.new";
 
-  	hotspot->calculateTemperature(unit_temp, 15, argv);
+  	hotspot->calculateTemperature(unit_temp, 17, argv);
 
 	/*Debug for temperature*/
 	double max_temp, max_cntlr_temp, max_bank_temp;
@@ -684,12 +731,12 @@ StatsManager::callHotSpot()
 				   << " CurrentTIme: " << cur_time_ms << std::endl;
 	m_stacked_dram_unison->clearCacheStats();
 
-	std::cout << "[STAT_DEBUG] End Calling HotSpot" << std::endl;
-	printf("---------------\n");
+	//std::cout << "[STAT_DEBUG] End Calling HotSpot" << std::endl;
+	//printf("---------------\n");
 	//printf("%s: %.5f, %s: %.5f, %s: %.5f\n", s1, max_temp, 
 	//										 s2, max_cntlr_temp,
 	//										 s3, max_bank_temp);
-	printf("-----------------------\n");
+	//printf("-----------------------\n");
 }
 
 void
@@ -716,6 +763,12 @@ void
 StatsManager::recordStats(String prefix)
 {
 	std::cout << "recordStats once at " << m_current_time.getUS() << std::endl;
+
+	m_record_interval = m_current_time - m_last_record_time;
+	if (m_record_interval == SubsecondTime::Zero()) {
+		m_record_interval = SubsecondTime::MS(1);
+	}
+	m_last_record_time = m_current_time;
 
    LOG_ASSERT_ERROR(m_db, "m_db not yet set up !?");
 

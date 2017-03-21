@@ -38,7 +38,7 @@ core_units = [('Execution Unit', 'exe'),
 			 ('L2', 'l2'),
 			 ('Renaming Unit', 'ru')]
 
-chosen_data = 'Runtime Dynamic'
+chosen_data = 'Peak Dynamic'
 
 class ThermalStats:
   def setup(self, args):
@@ -57,7 +57,7 @@ class ThermalStats:
     self.create_file = False
     for metric in ('power-static', 'power-dynamic'):
       for core in range(sim.config.ncores):
-        print "-----register: ", metric, " ", core
+#print "-----register: ", metric, " ", core
         sim.stats.register('core', core, metric, self.get_stat)
         sim.stats.register('L1-I', core, metric, self.get_stat)
         sim.stats.register('L1-D', core, metric, self.get_stat)
@@ -123,7 +123,7 @@ class ThermalStats:
 
   def update_power(self, power):
     def get_power(component, prefix = ''):
-      return Power(component[prefix + 'Subthreshold Leakage'] + component[prefix + 'Gate Leakage'], component[prefix + 'Runtime Dynamic'])
+      return Power(component[prefix + 'Subthreshold Leakage'] + component[prefix + 'Gate Leakage'], component[prefix + 'Peak Dynamic'])
     for core in range(sim.config.ncores):
       self.power[('L1-I', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/Instruction Cache/')
       self.power[('L1-D', core)] = get_power(power['Core'][core], 'Load Store Unit/Data Cache/')
@@ -183,7 +183,7 @@ vdd[] = %s
     ))
 
     result = {}
-    print 'run_power in thermalstats' + outputbase
+#print 'run_power in thermalstats' + outputbase
     execfile(outputbase + '.py', {}, result)
     return result['power']
 

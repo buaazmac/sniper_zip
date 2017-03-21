@@ -654,7 +654,7 @@ void populate_layers_grid(grid_model_t *model, flp_t *flp_default)
   /* read in values from the lcf when specified	*/
   if (model->has_lcf) {
       parse_layer_file(model, fp);
-      warning("layer configuration file specified. overriding default floorplan with those in lcf file...\n");
+      //warning("layer configuration file specified. overriding default floorplan with those in lcf file...\n");
   } else {
       /* default set of layers	*/
       populate_default_layers(model, flp_default);
