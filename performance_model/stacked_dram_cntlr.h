@@ -58,7 +58,7 @@ class StackedDramPerfUnison {
 
 		/* Remapping Manager (REMAP_MAN)*/
 		RemappingManager* m_remap_manager;
-		bool remapped;
+		bool remapped, enter_roi;
 		UInt32 v_remap_times, b_remap_times;
 
 		/* Some DRAM statistics*/
@@ -113,7 +113,7 @@ TODO: we need to consider vault parrellelism
 		void checkStat();
 		void tryRemapping();
 
-		void finishInvalidation();
+		void clearRemappingStat();
 		void updateStats();
 		void clearCacheStats();
 		void updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp);

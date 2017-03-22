@@ -132,6 +132,8 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 	/* (REMAP_MAN) Remapping Managere, policy defined here*/
 	m_remap_manager = new RemappingManager(this, 1);
 	remapped = false;
+	enter_roi = false;
+
 	v_remap_times = b_remap_times = 0;
 
 	tot_reads = tot_writes = tot_misses = 0;
@@ -268,27 +270,11 @@ StackedDramPerfUnison::getAccessLatency(
 	UInt32 remapVault = vault_i, remapBank = bank_i, remapRow = row_i;
 	bool valid_bit = m_remap_manager->getPhysicalIndex(&remapVault, &remapBank, &remapRow);
 
-	//debug
-#ifdef LOG_OUTPUT
-	log_file << "Set num: " << set_i 
-			  << ", vault_i: " << vault_i
-			  << ", bank_i: " << bank_i 
-			  << ", row_i: " << row_i 
-			  << "\n***remap vault and bank: "
-			  << remapVault << " " << remapBank;
-	if (remapVault != vault_i) {
-		log_file << "-----------not original map\n";
-	}
-	log_file << "..." << valid_v << std::endl;
-
-#endif
 	/**/
 	
 	VaultPerfModel* vault = m_vaults_array[remapVault];
 
 	SubsecondTime process_latency = SubsecondTime::Zero();
-
-	//process_latency += vault->processRequest(pkt_time, access_type, remapBank, row_i);
 
 	/*
 	   (ramulator)
@@ -335,31 +321,31 @@ TODO: Here we need to handle memory request with physical index
 		bool stall = true;
 		UInt32 clks = 0;
 		if (access_type == DramCntlrInterface::READ) {
-			stall = !m_dram_model->readRow(remapVault, remapBank, row_i, 0);
+			stall = !m_dram_model->readRow(remapVault, remapBank, remapRow, 0);
 			m_dram_model->tickOnce();
 			clks++;
-			/*
 			while (stall) {
+
+				/* (REMAP_MAN) Here we update statistics store unit*/
+				m_remap_manager->accessRow(remapVault, remapBank, remapRow, 1);
 
 				stall = !m_dram_model->readRow(remapVault, remapBank, row_i, 0);
 				m_dram_model->tickOnce();
 				clks++;
 			}
-			*/
 		} else {
-			stall = !m_dram_model->writeRow(remapVault, remapBank, row_i, 0);
+			stall = !m_dram_model->writeRow(remapVault, remapBank, remapRow, 0);
 			m_dram_model->tickOnce();
 			clks++;
-			/*
 			while (stall) {
 
-				//std::cout << "here is a stall!!" << std::endl;
+				/* (REMAP_MAN) Here we update statistics store unit*/
+				m_remap_manager->accessRow(remapVault, remapBank, remapRow, 1);
 
 				stall = !m_dram_model->writeRow(remapVault, remapBank, row_i, 0);
 				m_dram_model->tickOnce();
 				clks++;
 			}
-			*/
 		}
 		clks += m_dram_model->getReadLatency(remapVault);
 
@@ -368,14 +354,6 @@ TODO: Here we need to handle memory request with physical index
 
 		tot_clks += clks;
 	}
-#ifdef LOG_OUTPUT
-	log_file << "--Latency clks: " << tot_clks
-		     << ", idle clks: " << idle_clks
-			 << ", read latency: " << m_dram_model->getReadLatency(remapVault)
-			 << ", process_latency: " << process_latency.getNS()
-			 << std::endl;
-#endif
-	//process_latency = SubsecondTime::NS(2);
 	return process_latency;
 }
 
@@ -398,6 +376,7 @@ StackedDramPerfUnison::checkStat()
 {
 	/* here we check stats of DRAM and swap (REMAP_MAN)*/
 	//std::cout << "[REMAP_MAN]Here we check DRAM stat to decide swap or not!" << std::endl;
+	/*
 	bool remap = false;
 	UInt32 remap_times = 0;
 	
@@ -413,6 +392,7 @@ StackedDramPerfUnison::checkStat()
 		if (remap_times > 10) break;
 	}
 	remapped = true;
+	*/
 }
 
 bool
@@ -433,9 +413,9 @@ StackedDramPerfUnison::checkDramValid(bool *valid_arr, UInt32* b_valid_arr, UInt
 }
 
 void
-StackedDramPerfUnison::finishInvalidation()
+StackedDramPerfUnison::clearRemappingStat()
 {
-	m_remap_manager->finishRemapping();
+	m_remap_manager->clearRemappingStat();
 }
 
 void
@@ -506,7 +486,8 @@ StackedDramPerfUnison::clearCacheStats()
 void
 StackedDramPerfUnison::updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp)
 {
-	m_remap_manager->updateTemperature(v, v_temp);
+	m_remap_manager->updateTemperature(v, b, temperature, v_temp);
+	enter_roi = true;
 }
 
 //-------------------------------------ALLOY-------------------------

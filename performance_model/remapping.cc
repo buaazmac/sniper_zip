@@ -149,8 +149,13 @@ StatStoreUnit::StatStoreUnit(UInt32 vaults, UInt32 banks, UInt32 rows) :
 			m_table[i].just_remapped = false;
 	}
 	vault_temperature = new UInt32[n_vaults];
+	bank_temperature = new UInt32[n_vaults * n_banks];
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		vault_temperature[i] = 0;
+		for (UInt32 j = 0; j < n_banks; j++) {
+			UInt32 idx = i * n_banks + j;
+			bank_temperature[idx] = 0;
+		}
 	}
 }
 
@@ -166,7 +171,7 @@ StatStoreUnit::clear(UInt32 idx)
 	m_table[idx].access_count = 0;
 	m_table[idx].valid = true;
 	// Here we first test all parts of DRAM only remap once
-	//m_table[idx].just_remapped = false;
+	m_table[idx].just_remapped = false;
 }
 
 void
@@ -207,6 +212,13 @@ StatStoreUnit::setControllerTemp(UInt32 idx, UInt32 x)
 	vault_temperature[idx] = x;
 }
 
+void
+StatStoreUnit::setBankTemp(UInt32 v, UInt32 b, UInt32 x)
+{
+	UInt32 idx = v * n_banks + b;
+	bank_temperature[idx] = x;
+}
+
 UInt32
 StatStoreUnit::getAccess(UInt32 idx)
 {
@@ -224,6 +236,12 @@ bool
 StatStoreUnit::isJustRemapped(UInt32 idx)
 {
 	return m_table[idx].just_remapped;
+}
+
+UInt32
+StatStoreUnit::getBankTemp(UInt32 bank_i)
+{
+	return bank_temperature[bank_i];
 }
 
 UInt32 
@@ -284,6 +302,9 @@ RemappingManager::RemappingManager(StackedDramPerfUnison* dram_perf_cntlr, UInt3
 	n_rows = dram_perf_cntlr->n_rows;
 	m_remap_table = new RemappingTable(n_vaults, n_banks, n_rows);
 	m_stat_unit = new StatStoreUnit(n_vaults, n_banks, n_rows);
+
+	tot_access = hot_access = cool_access = 0;
+	tot_access_last = hot_access_last = cool_access_last = 0;
 }
 
 RemappingManager::~RemappingManager()
@@ -307,6 +328,41 @@ RemappingManager::accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 
 {
 	/* Physical Index*/
 	UInt32 idx = translateIdx(vault_i, bank_i, row_i);
+	UInt32 bank_idx = vault_i * n_banks + bank_i;
+	UInt32 bank_temp = m_stat_unit->getBankTemp(bank_idx);
+
+	/* Check if there is a hot row */
+	if (bank_temp > 85) {
+		hot_access += req_times;
+
+		/* Test remapping on every hot access*/
+		bool cross = false;
+		UInt32 src = m_remap_table->getLogIdx(idx);
+		UInt32 target = findTargetInVault(src);
+
+
+		if (target == INVALID_TARGET) {
+			target = findTargetCrossVault(src);
+			cross = true;
+		}
+		if (target != INVALID_TARGET) {
+			issueRowRemap(src, target);
+		}
+
+		std::cout << "There is a hot access!" 
+				  << "vault: " << vault_i
+				  << ", bank: " << bank_i
+				  << ", row: " << row_i << endl;
+		std::cout << "Here is some data we need to check:\n"
+				  << "**phy_idx: " << idx 
+				  << ", log_idx: " << src
+				  << ", target: " << target << std::endl;
+
+	} else {
+		cool_access += req_times;
+	}
+	tot_access += req_times;
+
 	UInt32 access = m_stat_unit->getAccess(idx);
 	m_stat_unit->setAccess(idx, access + req_times);
 }
@@ -334,23 +390,43 @@ RemappingManager::findHottestRow()
 	UInt32 hottest = INVALID_TARGET;
 	UInt32 max_access = m_stat_unit->row_access_threshold;
 
-	//std::cout << "Start finding hottest row!\n";
+	for (UInt32 v_i = 0; v_i < n_vaults; v_i++) {
+		UInt32 vault_temp = m_stat_unit->getVaultTemp(v_i);
+		if (vault_temp <= m_stat_unit->temperature_threshold) continue;
+		for (UInt32 b_i = 0; b_i < n_banks; b_i++) {
 
-	for (UInt32 i = 0; i < row_nums; i++) {
+			UInt32 phy_bank_idx = v_i * n_banks + b_i;
 
-		//std::cout << "checking: " << i << std::endl;
+			UInt32 bank_temp = m_stat_unit->getBankTemp(phy_bank_idx);
 
-		UInt32 log_idx = m_remap_table->getLogIdx(i);
+			if (bank_temp < m_stat_unit->temperature_threshold) continue;
 
-		//std::cout << "log_idx: " << log_idx << std::endl;
+			UInt32 max_bank_access = 0, tot_bank_access = 0;
 
-		bool just_remapped = m_stat_unit->isJustRemapped(i),
-			 valid = m_remap_table->getValid(log_idx);
-		if (!valid || just_remapped) continue;
-		UInt32 access = m_stat_unit->getAccess(i);
-		if (access > max_access) {
-			max_access = access;
-			hottest = i;
+			for (UInt32 r_i = 0; r_i < n_rows; r_i++) {
+				UInt32 phy_idx = this->translateIdx(v_i, b_i, r_i);
+				UInt32 log_idx = m_remap_table->getLogIdx(phy_idx);
+
+				bool just_remapped = m_stat_unit->isJustRemapped(phy_idx),
+					 valid = m_remap_table->getValid(log_idx);
+				/* If this row is unavailable, we just skip it*/
+				if (!valid || just_remapped) continue;
+
+				UInt32 access = m_stat_unit->getAccess(phy_idx);
+
+				if (access > max_bank_access) max_bank_access = access;
+				tot_bank_access += access;
+
+				if (access > max_access) {
+					max_access = access;
+					hottest = phy_idx;
+				}
+			}
+			/*
+			if (max_bank_access > 0) {
+				std::cout << "This hot bank: " << max_bank_access << ' ' << tot_bank_access << std::endl << "**" << std::endl;
+			}
+			*/
 		}
 	}
 	//std::cout << "Who is hottest? ..." << hottest << "!!\n";
@@ -372,20 +448,26 @@ RemappingManager::findTargetInVault(UInt32 src_log)
 	UInt32 s_lev = b / 2;
 	
 	UInt32 des_phy = (v + 1) * n_banks * n_rows - 1;
+
 	while (des_phy > src_phy) {
 		UInt32 des_log = m_remap_table->getLogIdx(des_phy);
+
+		des_phy --;
+
 		UInt32 tv = 0, tb = 0, tr = 0;
 		splitIdx(des_phy, &tv, &tb, &tr);
 		UInt32 d_lev = tb / 2;
+		UInt32 bank_temp = m_stat_unit->getBankTemp(tv * n_banks + tb);
 		bool just_remapped = m_stat_unit->isJustRemapped(des_phy),
 			 valid = m_remap_table->getValid(des_log);
 		/* We also choose position higher than source and untouched */
-		if (d_lev > s_lev && !just_remapped && valid) {
-			target = des_phy;
+		if (just_remapped || !valid) {
+			continue;
 		}
-		if (d_lev <= s_lev) break;
-		
-		des_phy --;
+		if (d_lev > s_lev && bank_temp < m_stat_unit->temperature_threshold) {
+			target = des_phy;
+			break;
+		}
 	}
 	return target;
 	
@@ -395,14 +477,42 @@ RemappingManager::findTargetInVault(UInt32 src_log)
 UInt32
 RemappingManager::findTargetCrossVault(UInt32 src_log)
 {
+	std::cout << "Here we start to find target in other vaults!\n";
+
 	UInt32 target = INVALID_TARGET;
+	bool found = false;
 	if (src_log == INVALID_TARGET) return INVALID_TARGET;
+	for (int b_i = n_banks - 1; b_i >= 0; b_i --) {
+		for (int v_i = 0; v_i < n_vaults; v_i ++) {
+			UInt32 phy_bank_idx = v_i * n_banks + b_i;
+			UInt32 bank_temp = m_stat_unit->getBankTemp(phy_bank_idx);
+			if (bank_temp >= m_stat_unit->temperature_threshold) continue;
+			for (int r_i = 0; r_i < n_rows; r_i ++) {
+				UInt32 des_phy = this->translateIdx(v_i, b_i, r_i);
+				UInt32 des_log = m_remap_table->getLogIdx(des_phy);
+
+				bool just_remapped = m_stat_unit->isJustRemapped(des_phy),
+					 valid = m_remap_table->getValid(des_log);
+
+				/* We also choose position higher than source and untouched */
+				if (!just_remapped && valid) {
+					target = des_phy;
+					return target;
+				}
+			}
+		}
+	}
 	return target;
 }
 
 UInt32
 RemappingManager::tryRemapping(bool remap)
 {
+	/* If we have not entered ROI, just return*/
+	if (m_stat_unit->getBankTemp(0) == 0) return 0;
+
+	int max_remap_times = 0;
+
 	if (remap == false) return 0;
 	int remap_times = 0;
 	while (remap_times < max_remap_times) {
@@ -411,31 +521,44 @@ RemappingManager::tryRemapping(bool remap)
 		//std::cout << "haha\n";
 
 		/* Check if there is a hot row */
+		bool cross = false;
 		if (src == INVALID_TARGET) break;
 		UInt32 target = findTargetInVault(src);
 		if (target == INVALID_TARGET) {
 			target = findTargetCrossVault(src);
+			cross = true;
 		}
 		if (src == INVALID_TARGET || target == INVALID_TARGET)
 			break;
-		//std::cout << "[REMAP_DEBUG] Find a hot row and prepare remapping!\n"
-		//		  << "---src: " << src << "---target: " << target << std::endl;
+
 		issueRowRemap(src, target);
 		remap_times ++;
 	}
+	/*
+	std::cout << "We find " << remap_times << " hot pages" << std::endl;
+	std::cout << "There are " << tot_access - tot_access_last << " access, "
+			  << hot_access - hot_access_last << " hot access, "
+			  << cool_access - cool_access_last << " cool access.\n";
+	*/
+	hot_access_last = hot_access;
+	cool_access_last = cool_access;
+	tot_access_last = tot_access;
+
 	return remap_times;
 }
 
 void
-RemappingManager::updateTemperature(UInt32 v, UInt32 v_temp)
+RemappingManager::updateTemperature(UInt32 v, UInt32 b, UInt32 temp, UInt32 v_temp)
 {
 	m_stat_unit->setControllerTemp(v, v_temp);
+	m_stat_unit->setBankTemp(v, b, temp);
 }
 
 void
 RemappingManager::reset(UInt32 v, UInt32 b, UInt32 r)
 {
 	UInt32 idx = translateIdx(v, b, r);
+
 	m_remap_table->setValid(idx, true);
 	m_remap_table->setMigrated(idx, false);
 	m_stat_unit->clear(idx);
@@ -450,7 +573,7 @@ RemappingManager::resetRemapping()
 }
 
 void
-RemappingManager::finishRemapping()
+RemappingManager::clearRemappingStat()
 {
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		for (UInt32 j = 0; j < n_banks; j++) {

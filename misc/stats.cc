@@ -193,6 +193,7 @@ StatsManager::init()
    }
    /*Initialize current time*/
    m_current_time = SubsecondTime::Zero();
+   m_last_remap_time = SubsecondTime::Zero();
    m_last_record_time = SubsecondTime::Zero();
    m_record_interval = SubsecondTime::Zero();
 
@@ -457,6 +458,7 @@ StatsManager::dumpHotspotInput()
 	 * init_file(tmp.steady) from last time
 	 * -p powertrace.input
 	 */
+
 /* Write down power trace*/
 	std::ofstream pt_file;
 	pt_file.open("./HotSpot/powertrace.input");
@@ -496,6 +498,24 @@ StatsManager::dumpHotspotInput()
 			}
 		}
 		pt_file << std::endl;
+
+		/* Here we output power trace for drawing picture*/
+		power_trace_log << power_L3;
+		for (int i = 0; i < 4; i++) {
+			power_trace_log << "\t" << power_exe[i] << "\t" << power_ifetch[i] 
+					<< "\t" << power_lsu[i] << "\t" << power_mmu[i]
+					<< "\t" << power_l2[i] << "\t" << power_ru[i];
+		}
+		for (int i = 0; i < 32; i++) {
+			power_trace_log << "\t" << vault_power[i];
+		}
+		for (int j = 0; j < 8; j++) {
+			for (int i =0; i < 32; i++) {
+				power_trace_log << "\t" << bank_power[i][j];
+			}
+		}
+		power_trace_log << std::endl;
+		/**/
 	}
 //for (int pt_it = 0; pt_it < 2; pt_it++) {
 	/*
@@ -733,8 +753,9 @@ StatsManager::callHotSpot()
 			 * Here we set vault controller temperature
 			 * to any bank in the vault (because of temperature sensor)
 			 */
-			int vault_temp = int(unit_temp[25 + v_i]);
-			m_stacked_dram_unison->updateTemperature(v_i, b_i, unit_temp[i], vault_temp);
+			int vault_temp = int(unit_temp[25 + v_i]),
+				bank_temp = int(unit_temp[i]);
+			m_stacked_dram_unison->updateTemperature(v_i, b_i, bank_temp, vault_temp);
 			if (unit_temp[i] > 85) {
 				hot_access[v_i][b_i] += tmp->reads + tmp->writes;
 			} else {
@@ -769,6 +790,13 @@ StatsManager::updateCurrentTime(SubsecondTime t)
 	if (t > m_current_time) {
 		m_current_time = t;
 	}
+	SubsecondTime time_elasped = m_current_time - m_last_remap_time;
+	if (time_elasped > RemapInterval) {
+		//std::cout << "Here a remap checking happens at " << m_current_time.getUS() << std::endl;
+		m_last_remap_time = m_current_time;
+		m_stacked_dram_unison->tryRemapping();
+	}
+	
 }
 
 double
@@ -820,7 +848,6 @@ StatsManager::recordStats(String prefix)
    callHotSpot();
 
    /* (REMAP_MAN) decide whether to remap*/
-   //m_stacked_dram_unison->checkStat();
    //m_stacked_dram_unison->tryRemapping();
 
    /* Dump power trace during runtime*/

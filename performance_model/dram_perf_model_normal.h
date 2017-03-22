@@ -149,6 +149,7 @@ class StackDramCacheCntlrUnison
 		UInt32 m_row_size;
 
 		UInt32 cache_access, page_misses, block_misses;
+		UInt32 cache_access_no_roi, page_misses_no_roi, block_misses_no_roi;
 		UInt32 wb_blocks, ld_blocks;
 
 		//log file

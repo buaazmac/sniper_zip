@@ -335,17 +335,24 @@ StackDramCacheCntlrUnison::StackDramCacheCntlrUnison(
 
 StackDramCacheCntlrUnison::~StackDramCacheCntlrUnison()
 {
-	float miss_rate;
+	float miss_rate = 0;
 	UInt32 tot_miss = page_misses + block_misses;
 
 	if (cache_access != 0) 
 		miss_rate = (float)tot_miss / (float)cache_access;
-	else
-		miss_rate = 0;
+
+	UInt32 cache_access_roi = cache_access - cache_access_no_roi,
+		   tot_miss_roi = tot_miss - page_misses_no_roi - block_misses_no_roi;
+	float miss_rate_roi = 0;
+	if (cache_access_roi != 0)
+		miss_rate_roi = (float)tot_miss_roi / (float)cache_access_roi;
 
 	std::cout << "\n ***** [DRAM_CACHE_Result] *****\n\n";
 	std::cout << "*** DRAM Total Access: " << cache_access 
 			  << ", miss: " << tot_miss << ", miss rate: " << miss_rate 
+			  << std::endl;
+	std::cout << "*** DRAM Total Access In ROI: " << cache_access_roi
+			  << ", miss: " << tot_miss_roi << ", miss rate: " << miss_rate_roi
 			  << std::endl;
 	std::cout << "*** DRAM Remap Times: " 
 			  << m_dram_perf_model->v_remap_times << " vault remaps, "
@@ -512,18 +519,6 @@ TODO:
 	
 	//m_dram_perf_model->checkTemperature(vault_i, bank_i);
 
-
-#ifdef ADDR_LOG
-	UInt32 hit_i32 = hit;
-	log_file << "-address: " << address
-			 << ", set: " << set_n
-			 << ", page_tag: " << page_tag
-			 << ", page_offset: " << page_offset 
-			 << ", hit: " << hit_i32
-			 << ", latency: " << dram_delay.getNS()
-			 << std::endl;
-#endif
-
 	model_delay += dram_delay;
 	model_delay += remap_delay;
 	model_delay += mem_access_delay;
@@ -543,13 +538,19 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 	UInt32 bank_num = (1 << bank_bit);
 	UInt32 vault_num = m_vault_num;
 
+	if (m_dram_perf_model->enter_roi == false) {
+		cache_access_no_roi = cache_access;
+		page_misses_no_roi = page_misses;
+		block_misses_no_roi = block_misses;
+	}
+
 	SubsecondTime dram_delay = SubsecondTime::Zero();
 	if (m_dram_perf_model->remapped == false) {
 		return dram_delay;
 	}
 
 	/* REMAP_DEBUG */
-	std::cout << "[REMAP_DEBUG] Here we found a remapping happened" << std::endl;
+	//std::cout << "[REMAP_DEBUG] Here we found a remapping happened" << std::endl;
 
 	m_dram_perf_model->remapped = false;
 
@@ -579,18 +580,19 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 				/* Latency for invalidation */
 				dram_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * set_wb_blocks);
 
+				/*
 				std::cout << "[REMAP_DEBUG] Amazing, we found an invalid row!\n"
 					      << "------wb_blocks: " << set_wb_blocks
 						  << "------valid blocks: " << set_valid_blocks
 						  << std::endl;
+						  */
 				
 				valid_blocks += row_valid_blocks;
 				writeback_blocks += row_wb_blocks;
 			}
 		}
 	}
-	std::cout << "[REMAP_DEBUG] Here we complete a remapping" << std::endl;
-	m_dram_perf_model->finishInvalidation();
+	m_dram_perf_model->clearRemappingStat();
 	//m_dram_perf_model->updateStats();
 
 	wb_blocks += writeback_blocks;
