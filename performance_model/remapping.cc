@@ -309,6 +309,12 @@ RemappingManager::RemappingManager(StackedDramPerfUnison* dram_perf_cntlr, UInt3
 
 RemappingManager::~RemappingManager()
 {
+	std::cout << "\n--Result From Stat Store Unit--\n" << std::endl;
+	std::cout << "[HotAccess]:\n"
+		  << "Total Access: " << tot_access << std::endl
+		  << ", Total Hot Access: " << hot_access << std::endl
+		  << ", Total Cool Access: " << cool_access << std::endl;
+	std::cout << "\n--Result From Stat Store Unit--\n" << std::endl;
 	delete m_remap_table;
 	delete m_stat_unit;
 }
@@ -336,6 +342,7 @@ RemappingManager::accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 
 		hot_access += req_times;
 
 		/* Test remapping on every hot access*/
+		/*
 		bool cross = false;
 		UInt32 src = m_remap_table->getLogIdx(idx);
 		UInt32 target = findTargetInVault(src);
@@ -348,15 +355,7 @@ RemappingManager::accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 
 		if (target != INVALID_TARGET) {
 			issueRowRemap(src, target);
 		}
-
-		std::cout << "There is a hot access!" 
-				  << "vault: " << vault_i
-				  << ", bank: " << bank_i
-				  << ", row: " << row_i << endl;
-		std::cout << "Here is some data we need to check:\n"
-				  << "**phy_idx: " << idx 
-				  << ", log_idx: " << src
-				  << ", target: " << target << std::endl;
+		*/
 
 	} else {
 		cool_access += req_times;
@@ -511,7 +510,7 @@ RemappingManager::tryRemapping(bool remap)
 	/* If we have not entered ROI, just return*/
 	if (m_stat_unit->getBankTemp(0) == 0) return 0;
 
-	int max_remap_times = 0;
+	int max_remap_times = 10;
 
 	if (remap == false) return 0;
 	int remap_times = 0;
