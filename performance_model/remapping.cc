@@ -309,12 +309,6 @@ RemappingManager::RemappingManager(StackedDramPerfUnison* dram_perf_cntlr, UInt3
 
 RemappingManager::~RemappingManager()
 {
-	std::cout << "\n--Result From Stat Store Unit--\n" << std::endl;
-	std::cout << "[HotAccess]:\n"
-		  << "Total Access: " << tot_access << std::endl
-		  << ", Total Hot Access: " << hot_access << std::endl
-		  << ", Total Cool Access: " << cool_access << std::endl;
-	std::cout << "\n--Result From Stat Store Unit--\n" << std::endl;
 	delete m_remap_table;
 	delete m_stat_unit;
 }
@@ -356,7 +350,6 @@ RemappingManager::accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 
 			issueRowRemap(src, target);
 		}
 		*/
-
 	} else {
 		cool_access += req_times;
 	}
@@ -510,7 +503,7 @@ RemappingManager::tryRemapping(bool remap)
 	/* If we have not entered ROI, just return*/
 	if (m_stat_unit->getBankTemp(0) == 0) return 0;
 
-	int max_remap_times = 10;
+	int max_remap_times = 0;
 
 	if (remap == false) return 0;
 	int remap_times = 0;

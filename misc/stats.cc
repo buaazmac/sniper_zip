@@ -366,6 +366,7 @@ StatsManager::dumpDramPowerTrace()
 
 		tot_access = tot_row_hits = 0;
 
+	    dram_stats_file << "@" <<  prefix << std::endl;
 		for (UInt32 i = 0; i < m_stacked_dram_alloy->n_vaults; i++) {
 			VaultPerfModel* vault = m_stacked_dram_alloy->m_vaults_array[i];
 			for (UInt32 j = 0; j < vault->n_banks; j++) {
@@ -409,6 +410,7 @@ StatsManager::dumpDramPowerTrace()
 
 		tot_access = tot_row_hits = 0;
 
+	    dram_stats_file << "@" <<  prefix << std::endl;
 		for (UInt32 i = 0; i < m_stacked_dram_mem->n_vaults; i++) {
 			VaultPerfModel* vault = m_stacked_dram_mem->m_vaults_array[i];
 			for (UInt32 j = 0; j < vault->n_banks; j++) {
@@ -773,13 +775,6 @@ StatsManager::callHotSpot()
 				   << " MissRate: " << miss_rate  
 				   << " CurrentTIme: " << cur_time_ms << std::endl;
 	m_stacked_dram_unison->clearCacheStats();
-
-	//std::cout << "[STAT_DEBUG] End Calling HotSpot" << std::endl;
-	//printf("---------------\n");
-	//printf("%s: %.5f, %s: %.5f, %s: %.5f\n", s1, max_temp, 
-	//										 s2, max_cntlr_temp,
-	//										 s3, max_bank_temp);
-	//printf("-----------------------\n");
 }
 
 void

@@ -283,16 +283,6 @@ public:
                 assert(false);
         }
 
-		/* For Debug
-		cout << "[Memory.h] Here we receive a request! " << req.addr << endl;
-		cout << "    After address mapping: ";
-
-		for (auto ad : req.addr_vec) {
-			cout << ad << ' ';
-		}
-		cout << endl;
-		*/
-
         if(ctrls[req.addr_vec[0]]->enqueue(req)) {
             // tally stats here to avoid double counting for requests that aren't enqueued
             ++num_incoming_requests;

@@ -60,7 +60,6 @@ StackedDramPerfMem::~StackedDramPerfMem()
 
 	myfile << "Total time: " << tot_ACT << ", " << tot_PRE << ", " << tot_RD << ", " << tot_WR << std::endl;
 	myfile << "Total access: "  << tot_access << ", Row Hit Rate: " << row_hit_rate << std::endl;
-	//myfile << "End." << std::endl;
 	myfile.close();
 
 	// DEBUG
@@ -97,6 +96,14 @@ StackedDramPerfMem::getAccessLatency(
 
 	SubsecondTime process_time = SubsecondTime::Zero();
 
+	//debug
+#ifdef LOG_OUTPUT
+	log_file  << "address: " << address
+			  << ", vault_i: " << v_i 
+			  << ", bank_i: " << bank_i 
+			  << ", row_i: " << row_i << std::endl;
+#endif
+	
 	process_time += vault->processRequest(pkt_time, access_type, bank_i, row_i);
 
 	return process_time;
@@ -143,7 +150,6 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 
 StackedDramPerfUnison::~StackedDramPerfUnison()
 {
-
 	// DEBUG
 	log_file.close();
 
@@ -191,20 +197,38 @@ StackedDramPerfUnison::getAccessLatency(
 		req_times = 1;
 	}
 
+	/*
+	UInt32 vault_bit = floorLog2(n_vaults);
+	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
+	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
+	*/
+
 	UInt32 vault_i = 0, bank_i = 0, row_i = 0;
 	splitSetNum(set_i, &vault_i, &bank_i, &row_i);
 	UInt32 ss = getSetNum(vault_i, bank_i, row_i);
 	if (ss != set_i) {
 		std::cout << "[ERROR] HooHoo, there is a problem with set number!\n";
 	}
+	/*
+	UInt32 vault_i = (set_i >> row_bit) & ((1UL << vault_bit) - 1);
+	UInt32 bank_i = set_i >> row_bit >> vault_bit; 
+	UInt32 row_i = set_i & ((1UL << row_bit) - 1);
+	*/
+
 	/* Here we find out the remapping result*/
 
 	bool valid_b = true, valid_v = true;
+	//UInt32 remapVault = m_vremap_table->getVaultIdx(vault_i, &valid_v);
+	//UInt32 remapBank = m_vremap_table->getBankIdx(vault_i, bank_i, &valid_b);
+	// Handle an access in remapping
+	//m_vremap_table->accessOnce(vault_i, bank_i, access_type, pkt_time);
 	/* REMAP_MAN*/
 	UInt32 remapVault = vault_i, remapBank = bank_i, remapRow = row_i;
 	bool valid_bit = m_remap_manager->getPhysicalIndex(&remapVault, &remapBank, &remapRow);
 
 	/**/
+	
+	VaultPerfModel* vault = m_vaults_array[remapVault];
 
 	SubsecondTime process_latency = SubsecondTime::Zero();
 
@@ -239,11 +263,6 @@ TODO: Here we need to handle memory request with physical index
 	   */
 	/* (REMAP_MAN) Here we update statistics store unit*/
 	m_remap_manager->accessRow(remapVault, remapBank, remapRow, req_times);
-	
-	//valid_bit = m_remap_manager->getPhysicalIndex(&remapVault, &remapBank, &remapRow);
-	if (valid_bit == false) {
-		std::cout << "Here we have a row just remapped!\n";
-	}
 
 	/* STAT_DEBUG */
 	if (access_type == DramCntlrInterface::READ) {
@@ -303,7 +322,7 @@ StackedDramPerfUnison::checkTemperature(UInt32 vault_i, UInt32 bank_i)
 void
 StackedDramPerfUnison::tryRemapping()
 {
-	UInt32 remap_times = m_remap_manager->tryRemapping(false);
+	UInt32 remap_times = m_remap_manager->tryRemapping(true);
 	//std::cout << "[REMAP_MAN] Here happens " << remap_times << " remaps!" << std::endl;
 	remapped = true;
 }
@@ -358,7 +377,15 @@ StackedDramPerfUnison::clearRemappingStat()
 void
 StackedDramPerfUnison::updateStats()
 {
+	/* STAT_DEBUG*/
 	int memory_remaining_ticks = m_dram_model->interval_ticks;
+	/*
+	std::cout << "[update stats]------------" << std::endl;
+	std::cout << "---tot_reads: " << tot_reads
+			  << "---tot_writes: " << tot_writes
+			  << "---remaining mem tick: " << memory_remaining_ticks
+			  << std::endl;
+	*/
 	/* Tick Ramulator until queue empty*/
 	for (int i = 0; i < memory_remaining_ticks; i++) {
 		m_dram_model->tickOnce();
@@ -379,9 +406,6 @@ StackedDramPerfUnison::updateStats()
 		tot_row_hits += vault->stats.row_hits;
 
 		for (UInt32 j = 0; j < vault->n_banks; j++) {
-
-			UInt32 bank_temp = m_remap_manager->m_stat_unit->getBankTemp(i * n_banks + j);
-
 			BankPerfModel* bank = vault->m_banks_array[j];
 			bank->stats.tACT = SubsecondTime::NS(m_dram_model->getBankActTime(i, j));
 			bank->stats.tPRE = SubsecondTime::NS(m_dram_model->getBankActTime(i, j));
@@ -409,6 +433,13 @@ void
 StackedDramPerfUnison::updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp)
 {
 	m_remap_manager->updateTemperature(v, b, temperature, v_temp);
+	if (temperature >= 85) {
+		m_dram_model->setBankRef(v, b, true);
+		std::cout << " Set Higher Ref Freq in bank " << v << " " << b << std::endl;
+	} else {
+		m_dram_model->setBankRef(v, b, false);
+	}
+	enter_roi = true;
 }
 
 //-------------------------------------ALLOY-------------------------

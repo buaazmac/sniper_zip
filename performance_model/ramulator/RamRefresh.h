@@ -36,9 +36,12 @@ class Refresh {
 public:
   RamController* ctrl;
   long clk, refreshed;
+  long *bank_ref_interval;
+  long *bank_refreshed;
   // Per-bank refresh counter to track the refresh progress for each rank
   vector<int> bank_ref_counters;
   int max_rank_count, max_bank_count;
+  int n_banks;
   int level_chan, level_rank, level_bank, level_sa;
 
   // ctor
@@ -49,10 +52,13 @@ public:
     // Clean up backlog
     for (unsigned int i = 0; i < bank_refresh_backlog.size(); i++)
       delete bank_refresh_backlog[i];
+	delete bank_ref_interval;
+	delete bank_refreshed;
   }
 
   // Basic refresh scheduling for all bank refresh that is applicable to all DRAM types
   void tick_ref();
+  void set_ref_interval(int bank_i, bool hot);
 
 private:
   // Keeping track of refresh status of every bank: + means ahead of schedule, - means behind schedule
@@ -71,6 +77,8 @@ private:
 
   // Inject refresh at either rank or bank level
   void inject_refresh(bool b_ref_rank);
+
+  void inject_bank_refresh(int bank_i);
 
   // DSARP
   void early_inject_refresh();

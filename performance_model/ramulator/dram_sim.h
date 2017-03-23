@@ -33,7 +33,8 @@ public:
 	RamMemory* memory;
 	map<int, int> latencies;
 	function<void(RamRequest&)> read_complete;
-	int interval_ticks;
+	long interval_ticks;
+	long tot_ticks;
 
 	void printSpec();
 
@@ -46,6 +47,7 @@ public:
 
 	void tickOnce();
 	void resetIntervalTick();
+	void setBankRef(int vault, int bank, bool hot);
 
 	/* The unit of all time stats is "NS" */
 

@@ -318,6 +318,11 @@ namespace ramulator
         queue->q.erase(req);
     }
 
+	void RamController::setBankRef(int bank_i, bool hot)
+	{
+		refresh->set_ref_interval(bank_i, hot);
+	}
+
     void RamController::issue_cmd(Command cmd, const vector<int>& addr_vec)
     {
         assert(is_ready(cmd, addr_vec));

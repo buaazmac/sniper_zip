@@ -139,6 +139,9 @@ public:
 	// Move to .cc because of forward declaration
 	void tick();
 
+	// ZMAC ADDED: Set refresh rate for banks
+	void setBankRef(int bank_i, bool hot);
+
     bool is_ready(list<RamRequest>::iterator req)
     {
         Command cmd = get_first_cmd(req);

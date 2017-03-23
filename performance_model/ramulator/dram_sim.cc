@@ -28,10 +28,20 @@ DramModel::DramModel(const std::string& fname)
 
 	/* interval ticks initialization*/
 	interval_ticks = 500000;
+	tot_ticks = 0;
 }
 
 DramModel::~DramModel()
 {
+	std::cout << "[RAMULATOR OUTPUT]" << std::endl;
+	std::cout << "\n**Total Ticks: " << tot_ticks << std::endl;
+	std::cout << "\n**Serving Request**\n";
+	for (int i = 0; i < C; i++) {
+		std::cout << "Channel_" << i << ": "
+				  << "serving reads(" << getVaultRdReq(i) << "), "
+				  << "serving writes(" << getVaultWrReq(i) << ")." << endl;
+	}
+	std::cout << "[RAMULATOR OUTPUT]" << std::endl;
 }
 
 /*Test the functionality of our code*/
@@ -130,11 +140,17 @@ void DramModel::tickOnce()
 {
 	memory->tick();
 	interval_ticks --;
+	tot_ticks ++;
 }
 
 void DramModel::resetIntervalTick()
 {
 	interval_ticks = 500000;
+}
+
+void DramModel::setBankRef(int vault, int bank, bool hot)
+{
+	memory->ctrls[vault]->setBankRef(bank, hot);
 }
 
 int DramModel::getReadLatency(int vault)
