@@ -1,0 +1,1464 @@
+[Benchmarks] set sniper output to rundi /root/micro/workplace/results/fft_large_100us_remap
+/root/micro/workplace/results/fft_large_100us_remap
+[SPLASH] Benchmarks to run: fft
+
+[SPLASH] [========== Running benchmark fft ==========]
+[SPLASH] Setting up run directory: /root/micro/workplace/results/fft_large_100us_remap
+[SPLASH] Running 'SNIPER_APP_LD_PRELOAD=$LD_PRELOAD; unset LD_PRELOAD; /root/micro/workplace/micro_exp/run-sniper -n 4 -m 'localhost' -d '/root/micro/workplace/results/fft_large_100us_remap' -sthermalstats --power -c gainestown_cache --roi --curdir=/root/micro/workplace/micro_exp/benchmarks  --  /root/micro/workplace/micro_exp/benchmarks/splash2/splash2/codes/kernels/fft/FFT -m22 -p4':
+[SPLASH] [---------- Beginning of output ----------]
+[SNIPER] Start
+----------BEGIN_INIT_STATS_MANAGER------------
+----------END_INIT_STATS_MANAGER------------
+Normal Cache Total set: 524288
+sz[int(channel)]: 32
+now initialize a stacked dram unison cache
+Executing Python script /root/micro/workplace/results/fft_large_100us_remap/sim.scripts.py
+[SNIPER] --------------------------------------------------------------------------------
+[SNIPER] Sniper using Pin frontend
+[SNIPER] Running pre-ROI region in  CACHE_ONLY mode
+[SNIPER] Running application ROI in DETAILED mode
+[SNIPER] Running post-ROI region in FAST_FORWARD mode
+[SNIPER] --------------------------------------------------------------------------------
+
+FFT with Blocking Transpose
+   4194304 Complex Doubles
+   4 Processors
+   65536 Cache lines
+   16 Byte line size
+   4096 Bytes per page
+
+[HOOKS] Entering ROI
+[SNIPER] Enabling performance models
+[SNIPER] Setting instrumentation mode to DETAILED
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Try Remapping] Here we found 56 remaps!
+[Try Remapping] Here we found 15 remaps!
+[Try Remapping] Here we found 34 remaps!
+[Try Remapping] Here we found 38 remaps!
+[Try Remapping] Here we found 10 remaps!
+[Try Remapping] Here we found 8 remaps!
+[Try Remapping] Here we found 19 remaps!
+[Try Remapping] Here we found 14 remaps!
+[Try Remapping] Here we found 15 remaps!
+[Try Remapping] Here we found 38 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 176 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 183 remaps!
+[Try Remapping] Here we found 122 remaps!
+[Try Remapping] Here we found 76 remaps!
+[Try Remapping] Here we found 39 remaps!
+[Try Remapping] Here we found 42 remaps!
+[Try Remapping] Here we found 20 remaps!
+[Try Remapping] Here we found 67 remaps!
+[Try Remapping] Here we found 49 remaps!
+[Try Remapping] Here we found 32 remaps!
+[Try Remapping] Here we found 37 remaps!
+[Try Remapping] Here we found 56 remaps!
+[Try Remapping] Here we found 112 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 111 remaps!
+[Try Remapping] Here we found 85 remaps!
+[Try Remapping] Here we found 94 remaps!
+[Try Remapping] Here we found 115 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 114 remaps!
+[Try Remapping] Here we found 149 remaps!
+[Try Remapping] Here we found 97 remaps!
+[Try Remapping] Here we found 138 remaps!
+[Try Remapping] Here we found 129 remaps!
+[Try Remapping] Here we found 113 remaps!
+[Try Remapping] Here we found 112 remaps!
+[Try Remapping] Here we found 113 remaps!
+[Try Remapping] Here we found 98 remaps!
+[Try Remapping] Here we found 109 remaps!
+[Try Remapping] Here we found 118 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 68 remaps!
+[Try Remapping] Here we found 128 remaps!
+[Try Remapping] Here we found 137 remaps!
+[Try Remapping] Here we found 159 remaps!
+[Try Remapping] Here we found 125 remaps!
+[Try Remapping] Here we found 152 remaps!
+[Try Remapping] Here we found 116 remaps!
+[Try Remapping] Here we found 165 remaps!
+[Try Remapping] Here we found 136 remaps!
+[Try Remapping] Here we found 121 remaps!
+[Try Remapping] Here we found 112 remaps!
+[Try Remapping] Here we found 135 remaps!
+[Try Remapping] Here we found 101 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 97 remaps!
+[Try Remapping] Here we found 95 remaps!
+[Try Remapping] Here we found 84 remaps!
+[Try Remapping] Here we found 121 remaps!
+[Try Remapping] Here we found 96 remaps!
+[Try Remapping] Here we found 141 remaps!
+[Try Remapping] Here we found 145 remaps!
+[Try Remapping] Here we found 105 remaps!
+[Try Remapping] Here we found 154 remaps!
+[Try Remapping] Here we found 136 remaps!
+[Try Remapping] Here we found 144 remaps!
+[Try Remapping] Here we found 76 remaps!
+[Try Remapping] Here we found 101 remaps!
+[Try Remapping] Here we found 122 remaps!
+[Try Remapping] Here we found 114 remaps!
+[Try Remapping] Here we found 98 remaps!
+[Try Remapping] Here we found 94 remaps!
+[Try Remapping] Here we found 96 remaps!
+[Try Remapping] Here we found 96 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 85 remaps!
+[Try Remapping] Here we found 129 remaps!
+[Try Remapping] Here we found 106 remaps!
+[Try Remapping] Here we found 128 remaps!
+[Try Remapping] Here we found 109 remaps!
+[Try Remapping] Here we found 114 remaps!
+[Try Remapping] Here we found 83 remaps!
+[Try Remapping] Here we found 109 remaps!
+[Try Remapping] Here we found 109 remaps!
+[Try Remapping] Here we found 128 remaps!
+[Try Remapping] Here we found 107 remaps!
+[Try Remapping] Here we found 123 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 86 remaps!
+[Try Remapping] Here we found 135 remaps!
+[Try Remapping] Here we found 112 remaps!
+[Try Remapping] Here we found 158 remaps!
+[Try Remapping] Here we found 110 remaps!
+[Try Remapping] Here we found 98 remaps!
+[Try Remapping] Here we found 85 remaps!
+[Try Remapping] Here we found 68 remaps!
+[Try Remapping] Here we found 75 remaps!
+[Try Remapping] Here we found 95 remaps!
+[Try Remapping] Here we found 104 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 78 remaps!
+[Try Remapping] Here we found 101 remaps!
+[Try Remapping] Here we found 94 remaps!
+[Try Remapping] Here we found 105 remaps!
+[Try Remapping] Here we found 71 remaps!
+[Try Remapping] Here we found 88 remaps!
+[Try Remapping] Here we found 88 remaps!
+[Try Remapping] Here we found 115 remaps!
+[Try Remapping] Here we found 116 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 95 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 114 remaps!
+[Try Remapping] Here we found 91 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 100 remaps!
+[Try Remapping] Here we found 74 remaps!
+[Try Remapping] Here we found 105 remaps!
+[Try Remapping] Here we found 125 remaps!
+[Try Remapping] Here we found 107 remaps!
+[Try Remapping] Here we found 59 remaps!
+[Try Remapping] Here we found 103 remaps!
+[Try Remapping] Here we found 98 remaps!
+[Try Remapping] Here we found 83 remaps!
+[Try Remapping] Here we found 72 remaps!
+[Try Remapping] Here we found 93 remaps!
+[Try Remapping] Here we found 78 remaps!
+[Try Remapping] Here we found 61 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 68 remaps!
+[Try Remapping] Here we found 46 remaps!
+[Try Remapping] Here we found 85 remaps!
+[Try Remapping] Here we found 81 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 72 remaps!
+[Try Remapping] Here we found 88 remaps!
+[Try Remapping] Here we found 111 remaps!
+[Try Remapping] Here we found 133 remaps!
+[Try Remapping] Here we found 109 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 83 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 64 remaps!
+[Try Remapping] Here we found 66 remaps!
+[Try Remapping] Here we found 88 remaps!
+[Try Remapping] Here we found 62 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 95 remaps!
+[Try Remapping] Here we found 86 remaps!
+[Try Remapping] Here we found 82 remaps!
+[Try Remapping] Here we found 59 remaps!
+[Try Remapping] Here we found 87 remaps!
+[Try Remapping] Here we found 54 remaps!
+[Try Remapping] Here we found 59 remaps!
+[Try Remapping] Here we found 61 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 48 remaps!
+[Try Remapping] Here we found 64 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 82 remaps!
+[Try Remapping] Here we found 74 remaps!
+[Try Remapping] Here we found 67 remaps!
+[Try Remapping] Here we found 75 remaps!
+[Try Remapping] Here we found 59 remaps!
+[Try Remapping] Here we found 49 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 59 remaps!
+[Try Remapping] Here we found 61 remaps!
+[Try Remapping] Here we found 61 remaps!
+[Try Remapping] Here we found 74 remaps!
+[Try Remapping] Here we found 53 remaps!
+[Try Remapping] Here we found 49 remaps!
+[Try Remapping] Here we found 47 remaps!
+[Try Remapping] Here we found 69 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 44 remaps!
+[Try Remapping] Here we found 91 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 83 remaps!
+[Try Remapping] Here we found 53 remaps!
+[Try Remapping] Here we found 78 remaps!
+[Try Remapping] Here we found 90 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 69 remaps!
+[Try Remapping] Here we found 82 remaps!
+[Try Remapping] Here we found 75 remaps!
+[Try Remapping] Here we found 69 remaps!
+[Try Remapping] Here we found 41 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 83 remaps!
+[Try Remapping] Here we found 62 remaps!
+[Try Remapping] Here we found 62 remaps!
+[Try Remapping] Here we found 54 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 56 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 52 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 52 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 71 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 68 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 77 remaps!
+[Try Remapping] Here we found 81 remaps!
+[Try Remapping] Here we found 103 remaps!
+[Try Remapping] Here we found 61 remaps!
+[Try Remapping] Here we found 72 remaps!
+[Try Remapping] Here we found 86 remaps!
+[Try Remapping] Here we found 85 remaps!
+[Try Remapping] Here we found 81 remaps!
+[Try Remapping] Here we found 76 remaps!
+[Try Remapping] Here we found 61 remaps!
+[Try Remapping] Here we found 56 remaps!
+[Try Remapping] Here we found 65 remaps!
+[Try Remapping] Here we found 44 remaps!
+[Try Remapping] Here we found 44 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 67 remaps!
+[Try Remapping] Here we found 80 remaps!
+[Try Remapping] Here we found 68 remaps!
+[Try Remapping] Here we found 85 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 71 remaps!
+[Try Remapping] Here we found 56 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 60 remaps!
+[Try Remapping] Here we found 66 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 65 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 61 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 100 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 88 remaps!
+[Try Remapping] Here we found 95 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 97 remaps!
+[Try Remapping] Here we found 90 remaps!
+[Try Remapping] Here we found 75 remaps!
+[Try Remapping] Here we found 95 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 85 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 72 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 124 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 117 remaps!
+[Try Remapping] Here we found 82 remaps!
+[Try Remapping] Here we found 97 remaps!
+[Try Remapping] Here we found 109 remaps!
+[Try Remapping] Here we found 92 remaps!
+[Try Remapping] Here we found 81 remaps!
+[Try Remapping] Here we found 96 remaps!
+[Try Remapping] Here we found 78 remaps!
+[Try Remapping] Here we found 78 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 85 remaps!
+[Try Remapping] Here we found 80 remaps!
+[Try Remapping] Here we found 113 remaps!
+[Try Remapping] Here we found 106 remaps!
+[Try Remapping] Here we found 82 remaps!
+[Try Remapping] Here we found 160 remaps!
+[Try Remapping] Here we found 131 remaps!
+[Try Remapping] Here we found 138 remaps!
+[Try Remapping] Here we found 84 remaps!
+[Try Remapping] Here we found 110 remaps!
+[Try Remapping] Here we found 103 remaps!
+[Try Remapping] Here we found 94 remaps!
+[Try Remapping] Here we found 98 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 114 remaps!
+[Try Remapping] Here we found 84 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 105 remaps!
+[Try Remapping] Here we found 142 remaps!
+[Try Remapping] Here we found 118 remaps!
+[Try Remapping] Here we found 124 remaps!
+[Try Remapping] Here we found 127 remaps!
+[Try Remapping] Here we found 148 remaps!
+[Try Remapping] Here we found 126 remaps!
+[Try Remapping] Here we found 109 remaps!
+[Try Remapping] Here we found 106 remaps!
+[Try Remapping] Here we found 130 remaps!
+[Try Remapping] Here we found 100 remaps!
+[Try Remapping] Here we found 108 remaps!
+[Try Remapping] Here we found 94 remaps!
+[Try Remapping] Here we found 101 remaps!
+[Try Remapping] Here we found 116 remaps!
+[Try Remapping] Here we found 75 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 119 remaps!
+[Try Remapping] Here we found 87 remaps!
+[Try Remapping] Here we found 135 remaps!
+[Try Remapping] Here we found 115 remaps!
+[Try Remapping] Here we found 137 remaps!
+[Try Remapping] Here we found 118 remaps!
+[Try Remapping] Here we found 76 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 93 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 111 remaps!
+[Try Remapping] Here we found 107 remaps!
+[Try Remapping] Here we found 114 remaps!
+[Try Remapping] Here we found 77 remaps!
+[Try Remapping] Here we found 127 remaps!
+[Try Remapping] Here we found 107 remaps!
+[Try Remapping] Here we found 108 remaps!
+[Try Remapping] Here we found 133 remaps!
+[Try Remapping] Here we found 167 remaps!
+[Try Remapping] Here we found 125 remaps!
+[Try Remapping] Here we found 107 remaps!
+[Try Remapping] Here we found 91 remaps!
+[Try Remapping] Here we found 113 remaps!
+[Try Remapping] Here we found 115 remaps!
+[Try Remapping] Here we found 68 remaps!
+[Try Remapping] Here we found 109 remaps!
+[Try Remapping] Here we found 66 remaps!
+[Try Remapping] Here we found 78 remaps!
+[Try Remapping] Here we found 67 remaps!
+[Try Remapping] Here we found 86 remaps!
+[Try Remapping] Here we found 91 remaps!
+[Try Remapping] Here we found 96 remaps!
+[Try Remapping] Here we found 144 remaps!
+[Try Remapping] Here we found 126 remaps!
+[Try Remapping] Here we found 127 remaps!
+[Try Remapping] Here we found 94 remaps!
+[Try Remapping] Here we found 103 remaps!
+[Try Remapping] Here we found 91 remaps!
+[Try Remapping] Here we found 81 remaps!
+[Try Remapping] Here we found 93 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 84 remaps!
+[Try Remapping] Here we found 114 remaps!
+[Try Remapping] Here we found 122 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 65 remaps!
+[Try Remapping] Here we found 90 remaps!
+[Try Remapping] Here we found 107 remaps!
+[Try Remapping] Here we found 125 remaps!
+[Try Remapping] Here we found 132 remaps!
+[Try Remapping] Here we found 93 remaps!
+[Try Remapping] Here we found 113 remaps!
+[Try Remapping] Here we found 116 remaps!
+[Try Remapping] Here we found 100 remaps!
+[Try Remapping] Here we found 112 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 80 remaps!
+[Try Remapping] Here we found 67 remaps!
+[Try Remapping] Here we found 59 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 90 remaps!
+[Try Remapping] Here we found 125 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 74 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 98 remaps!
+[Try Remapping] Here we found 96 remaps!
+[Try Remapping] Here we found 61 remaps!
+[Try Remapping] Here we found 96 remaps!
+[Try Remapping] Here we found 74 remaps!
+[Try Remapping] Here we found 93 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 93 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 70 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 130 remaps!
+[Try Remapping] Here we found 127 remaps!
+[Try Remapping] Here we found 78 remaps!
+[Try Remapping] Here we found 90 remaps!
+[Try Remapping] Here we found 77 remaps!
+[Try Remapping] Here we found 88 remaps!
+[Try Remapping] Here we found 71 remaps!
+[Try Remapping] Here we found 113 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 76 remaps!
+[Try Remapping] Here we found 42 remaps!
+[Try Remapping] Here we found 93 remaps!
+[Try Remapping] Here we found 82 remaps!
+[Try Remapping] Here we found 72 remaps!
+[Try Remapping] Here we found 42 remaps!
+[Try Remapping] Here we found 70 remaps!
+[Try Remapping] Here we found 61 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 56 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 47 remaps!
+[Try Remapping] Here we found 54 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 42 remaps!
+[Try Remapping] Here we found 65 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 69 remaps!
+[Try Remapping] Here we found 64 remaps!
+[Try Remapping] Here we found 56 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 66 remaps!
+[Try Remapping] Here we found 66 remaps!
+[Try Remapping] Here we found 81 remaps!
+[Try Remapping] Here we found 52 remaps!
+[Try Remapping] Here we found 47 remaps!
+[Try Remapping] Here we found 53 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 45 remaps!
+[Try Remapping] Here we found 53 remaps!
+[Try Remapping] Here we found 41 remaps!
+[Try Remapping] Here we found 28 remaps!
+[Try Remapping] Here we found 36 remaps!
+[Try Remapping] Here we found 44 remaps!
+[Try Remapping] Here we found 42 remaps!
+[Try Remapping] Here we found 41 remaps!
+[Try Remapping] Here we found 54 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 42 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 49 remaps!
+[Try Remapping] Here we found 47 remaps!
+[Try Remapping] Here we found 52 remaps!
+[Try Remapping] Here we found 40 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 39 remaps!
+[Try Remapping] Here we found 52 remaps!
+[Try Remapping] Here we found 45 remaps!
+[Try Remapping] Here we found 54 remaps!
+[Try Remapping] Here we found 68 remaps!
+[Try Remapping] Here we found 49 remaps!
+[Try Remapping] Here we found 38 remaps!
+[Try Remapping] Here we found 44 remaps!
+[Try Remapping] Here we found 43 remaps!
+[Try Remapping] Here we found 30 remaps!
+[Try Remapping] Here we found 44 remaps!
+[Try Remapping] Here we found 40 remaps!
+[Try Remapping] Here we found 47 remaps!
+[Try Remapping] Here we found 44 remaps!
+[Try Remapping] Here we found 46 remaps!
+[Try Remapping] Here we found 42 remaps!
+[Try Remapping] Here we found 54 remaps!
+[Try Remapping] Here we found 41 remaps!
+[Try Remapping] Here we found 46 remaps!
+[Try Remapping] Here we found 64 remaps!
+[Try Remapping] Here we found 61 remaps!
+[Try Remapping] Here we found 59 remaps!
+[Try Remapping] Here we found 45 remaps!
+[Try Remapping] Here we found 64 remaps!
+[Try Remapping] Here we found 47 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 52 remaps!
+[Try Remapping] Here we found 44 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 49 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 62 remaps!
+[Try Remapping] Here we found 46 remaps!
+[Try Remapping] Here we found 47 remaps!
+[Try Remapping] Here we found 33 remaps!
+[Try Remapping] Here we found 88 remaps!
+[Try Remapping] Here we found 59 remaps!
+[Try Remapping] Here we found 39 remaps!
+[Try Remapping] Here we found 67 remaps!
+[Try Remapping] Here we found 13 remaps!
+[Try Remapping] Here we found 8 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 109 remaps!
+[Try Remapping] Here we found 70 remaps!
+[Try Remapping] Here we found 131 remaps!
+[Try Remapping] Here we found 70 remaps!
+[Try Remapping] Here we found 144 remaps!
+[Try Remapping] Here we found 98 remaps!
+[Try Remapping] Here we found 84 remaps!
+[Try Remapping] Here we found 175 remaps!
+[Try Remapping] Here we found 80 remaps!
+[Try Remapping] Here we found 119 remaps!
+[Try Remapping] Here we found 126 remaps!
+[Try Remapping] Here we found 87 remaps!
+[Try Remapping] Here we found 137 remaps!
+[Try Remapping] Here we found 93 remaps!
+[Try Remapping] Here we found 113 remaps!
+[Try Remapping] Here we found 120 remaps!
+[Try Remapping] Here we found 105 remaps!
+[Try Remapping] Here we found 98 remaps!
+[Try Remapping] Here we found 148 remaps!
+[Try Remapping] Here we found 80 remaps!
+[Try Remapping] Here we found 138 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 48 remaps!
+[Try Remapping] Here we found 87 remaps!
+[Try Remapping] Here we found 86 remaps!
+[Try Remapping] Here we found 67 remaps!
+[Try Remapping] Here we found 66 remaps!
+[Try Remapping] Here we found 82 remaps!
+[Try Remapping] Here we found 83 remaps!
+[Try Remapping] Here we found 86 remaps!
+[Try Remapping] Here we found 84 remaps!
+[Try Remapping] Here we found 85 remaps!
+[Try Remapping] Here we found 130 remaps!
+[Try Remapping] Here we found 74 remaps!
+[Try Remapping] Here we found 120 remaps!
+[Try Remapping] Here we found 77 remaps!
+[Try Remapping] Here we found 88 remaps!
+[Try Remapping] Here we found 59 remaps!
+[Try Remapping] Here we found 59 remaps!
+[Try Remapping] Here we found 80 remaps!
+[Try Remapping] Here we found 71 remaps!
+[Try Remapping] Here we found 98 remaps!
+[Try Remapping] Here we found 75 remaps!
+[Try Remapping] Here we found 49 remaps!
+[Try Remapping] Here we found 31 remaps!
+[Try Remapping] Here we found 16 remaps!
+[Try Remapping] Here we found 8 remaps!
+[Try Remapping] Here we found 16 remaps!
+[Try Remapping] Here we found 3 remaps!
+[Try Remapping] Here we found 24 remaps!
+[Try Remapping] Here we found 69 remaps!
+[Try Remapping] Here we found 41 remaps!
+[Try Remapping] Here we found 64 remaps!
+[Try Remapping] Here we found 35 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 53 remaps!
+[Try Remapping] Here we found 69 remaps!
+[Try Remapping] Here we found 96 remaps!
+[Try Remapping] Here we found 77 remaps!
+[Try Remapping] Here we found 77 remaps!
+[Try Remapping] Here we found 114 remaps!
+[Try Remapping] Here we found 78 remaps!
+[Try Remapping] Here we found 74 remaps!
+[Try Remapping] Here we found 108 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 103 remaps!
+[Try Remapping] Here we found 86 remaps!
+[Try Remapping] Here we found 103 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 83 remaps!
+[Try Remapping] Here we found 90 remaps!
+[Try Remapping] Here we found 111 remaps!
+[Try Remapping] Here we found 76 remaps!
+[Try Remapping] Here we found 138 remaps!
+[Try Remapping] Here we found 83 remaps!
+[Try Remapping] Here we found 115 remaps!
+[Try Remapping] Here we found 97 remaps!
+[Try Remapping] Here we found 123 remaps!
+[Try Remapping] Here we found 112 remaps!
+[Try Remapping] Here we found 59 remaps!
+[Try Remapping] Here we found 103 remaps!
+[Try Remapping] Here we found 100 remaps!
+[Try Remapping] Here we found 104 remaps!
+[Try Remapping] Here we found 75 remaps!
+[Try Remapping] Here we found 83 remaps!
+[Try Remapping] Here we found 69 remaps!
+[Try Remapping] Here we found 37 remaps!
+[Try Remapping] Here we found 82 remaps!
+[Try Remapping] Here we found 49 remaps!
+[Try Remapping] Here we found 43 remaps!
+[Try Remapping] Here we found 67 remaps!
+[Try Remapping] Here we found 87 remaps!
+[Try Remapping] Here we found 87 remaps!
+[Try Remapping] Here we found 53 remaps!
+[Try Remapping] Here we found 78 remaps!
+[Try Remapping] Here we found 115 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 83 remaps!
+[Try Remapping] Here we found 113 remaps!
+[Try Remapping] Here we found 112 remaps!
+[Try Remapping] Here we found 141 remaps!
+[Try Remapping] Here we found 132 remaps!
+[Try Remapping] Here we found 137 remaps!
+[Try Remapping] Here we found 109 remaps!
+[Try Remapping] Here we found 169 remaps!
+[Try Remapping] Here we found 157 remaps!
+[Try Remapping] Here we found 127 remaps!
+[Try Remapping] Here we found 179 remaps!
+[Try Remapping] Here we found 126 remaps!
+[Try Remapping] Here we found 139 remaps!
+[Try Remapping] Here we found 92 remaps!
+[Try Remapping] Here we found 147 remaps!
+[Try Remapping] Here we found 164 remaps!
+[Try Remapping] Here we found 95 remaps!
+[Try Remapping] Here we found 181 remaps!
+[Try Remapping] Here we found 107 remaps!
+[Try Remapping] Here we found 91 remaps!
+[Try Remapping] Here we found 191 remaps!
+[Try Remapping] Here we found 91 remaps!
+[Try Remapping] Here we found 132 remaps!
+[Try Remapping] Here we found 171 remaps!
+[Try Remapping] Here we found 127 remaps!
+[Try Remapping] Here we found 171 remaps!
+[Try Remapping] Here we found 131 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 126 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 147 remaps!
+[Try Remapping] Here we found 112 remaps!
+[Try Remapping] Here we found 60 remaps!
+[Try Remapping] Here we found 150 remaps!
+[Try Remapping] Here we found 80 remaps!
+[Try Remapping] Here we found 67 remaps!
+[Try Remapping] Here we found 188 remaps!
+[Try Remapping] Here we found 80 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 169 remaps!
+[Try Remapping] Here we found 100 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 84 remaps!
+[Try Remapping] Here we found 90 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 165 remaps!
+[Try Remapping] Here we found 110 remaps!
+[Try Remapping] Here we found 156 remaps!
+[Try Remapping] Here we found 170 remaps!
+[Try Remapping] Here we found 156 remaps!
+[Try Remapping] Here we found 133 remaps!
+[Try Remapping] Here we found 151 remaps!
+[Try Remapping] Here we found 156 remaps!
+[Try Remapping] Here we found 152 remaps!
+[Try Remapping] Here we found 107 remaps!
+[Try Remapping] Here we found 121 remaps!
+[Try Remapping] Here we found 74 remaps!
+[Try Remapping] Here we found 122 remaps!
+[Try Remapping] Here we found 131 remaps!
+[Try Remapping] Here we found 95 remaps!
+[Try Remapping] Here we found 134 remaps!
+[Try Remapping] Here we found 88 remaps!
+[Try Remapping] Here we found 84 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 135 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 133 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 93 remaps!
+[Try Remapping] Here we found 120 remaps!
+[Try Remapping] Here we found 86 remaps!
+[Try Remapping] Here we found 111 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 84 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 163 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 47 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 24 remaps!
+[Try Remapping] Here we found 29 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 18 remaps!
+[Try Remapping] Here we found 29 remaps!
+[Try Remapping] Here we found 49 remaps!
+[Try Remapping] Here we found 13 remaps!
+[Try Remapping] Here we found 39 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 34 remaps!
+[Try Remapping] Here we found 37 remaps!
+[Try Remapping] Here we found 28 remaps!
+[Try Remapping] Here we found 33 remaps!
+[Try Remapping] Here we found 56 remaps!
+[Try Remapping] Here we found 56 remaps!
+[Try Remapping] Here we found 97 remaps!
+[Try Remapping] Here we found 76 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 79 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 35 remaps!
+[Try Remapping] Here we found 41 remaps!
+[Try Remapping] Here we found 48 remaps!
+[Try Remapping] Here we found 35 remaps!
+[Try Remapping] Here we found 36 remaps!
+[Try Remapping] Here we found 26 remaps!
+[Try Remapping] Here we found 28 remaps!
+[Try Remapping] Here we found 51 remaps!
+[Try Remapping] Here we found 41 remaps!
+[Try Remapping] Here we found 32 remaps!
+[Try Remapping] Here we found 18 remaps!
+[Try Remapping] Here we found 74 remaps!
+[Try Remapping] Here we found 51 remaps!
+[Try Remapping] Here we found 42 remaps!
+[Try Remapping] Here we found 40 remaps!
+[Try Remapping] Here we found 28 remaps!
+[Try Remapping] Here we found 18 remaps!
+[Try Remapping] Here we found 65 remaps!
+[Try Remapping] Here we found 28 remaps!
+[Try Remapping] Here we found 24 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 25 remaps!
+[Try Remapping] Here we found 4 remaps!
+[Try Remapping] Here we found 34 remaps!
+[Try Remapping] Here we found 16 remaps!
+[Try Remapping] Here we found 2 remaps!
+[Try Remapping] Here we found 8 remaps!
+[Try Remapping] Here we found 5 remaps!
+[Try Remapping] Here we found 1 remaps!
+[Try Remapping] Here we found 2 remaps!
+[Try Remapping] Here we found 2 remaps!
+[Try Remapping] Here we found 4 remaps!
+[Try Remapping] Here we found 6 remaps!
+[Try Remapping] Here we found 1 remaps!
+[Try Remapping] Here we found 11 remaps!
+[Try Remapping] Here we found 4 remaps!
+[Try Remapping] Here we found 1 remaps!
+[Try Remapping] Here we found 25 remaps!
+[Try Remapping] Here we found 15 remaps!
+[Try Remapping] Here we found 11 remaps!
+[Try Remapping] Here we found 41 remaps!
+[Try Remapping] Here we found 26 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 27 remaps!
+[Try Remapping] Here we found 25 remaps!
+[Try Remapping] Here we found 23 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 25 remaps!
+[Try Remapping] Here we found 26 remaps!
+[Try Remapping] Here we found 65 remaps!
+[Try Remapping] Here we found 33 remaps!
+[Try Remapping] Here we found 23 remaps!
+[Try Remapping] Here we found 23 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 18 remaps!
+[Try Remapping] Here we found 3 remaps!
+[Try Remapping] Here we found 2 remaps!
+[Try Remapping] Here we found 8 remaps!
+[Try Remapping] Here we found 20 remaps!
+[Try Remapping] Here we found 36 remaps!
+[Try Remapping] Here we found 48 remaps!
+[Try Remapping] Here we found 35 remaps!
+[Try Remapping] Here we found 44 remaps!
+[Try Remapping] Here we found 90 remaps!
+[Try Remapping] Here we found 51 remaps!
+[Try Remapping] Here we found 48 remaps!
+[Try Remapping] Here we found 71 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 49 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 48 remaps!
+[Try Remapping] Here we found 46 remaps!
+[Try Remapping] Here we found 90 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 31 remaps!
+[Try Remapping] Here we found 61 remaps!
+[Try Remapping] Here we found 38 remaps!
+[Try Remapping] Here we found 46 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 52 remaps!
+[Try Remapping] Here we found 77 remaps!
+[Try Remapping] Here we found 91 remaps!
+[Try Remapping] Here we found 78 remaps!
+[Try Remapping] Here we found 109 remaps!
+[Try Remapping] Here we found 122 remaps!
+[Try Remapping] Here we found 125 remaps!
+[Try Remapping] Here we found 132 remaps!
+[Try Remapping] Here we found 180 remaps!
+[Try Remapping] Here we found 121 remaps!
+[Try Remapping] Here we found 94 remaps!
+[Try Remapping] Here we found 133 remaps!
+[Try Remapping] Here we found 110 remaps!
+[Try Remapping] Here we found 89 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 74 remaps!
+[Try Remapping] Here we found 131 remaps!
+[Try Remapping] Here we found 54 remaps!
+[Try Remapping] Here we found 69 remaps!
+[Try Remapping] Here we found 127 remaps!
+[Try Remapping] Here we found 53 remaps!
+[Try Remapping] Here we found 64 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 26 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 106 remaps!
+[Try Remapping] Here we found 62 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 149 remaps!
+[Try Remapping] Here we found 104 remaps!
+[Try Remapping] Here we found 137 remaps!
+[Try Remapping] Here we found 156 remaps!
+[Try Remapping] Here we found 138 remaps!
+[Try Remapping] Here we found 137 remaps!
+[Try Remapping] Here we found 160 remaps!
+[Try Remapping] Here we found 82 remaps!
+[Try Remapping] Here we found 133 remaps!
+[Try Remapping] Here we found 132 remaps!
+[Try Remapping] Here we found 54 remaps!
+[Try Remapping] Here we found 90 remaps!
+[Try Remapping] Here we found 121 remaps!
+[Try Remapping] Here we found 101 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 125 remaps!
+[Try Remapping] Here we found 107 remaps!
+[Try Remapping] Here we found 65 remaps!
+[Try Remapping] Here we found 40 remaps!
+[Try Remapping] Here we found 128 remaps!
+[Try Remapping] Here we found 91 remaps!
+[Try Remapping] Here we found 97 remaps!
+[Try Remapping] Here we found 96 remaps!
+[Try Remapping] Here we found 124 remaps!
+[Try Remapping] Here we found 136 remaps!
+[Try Remapping] Here we found 142 remaps!
+[Try Remapping] Here we found 151 remaps!
+[Try Remapping] Here we found 175 remaps!
+[Try Remapping] Here we found 177 remaps!
+[Try Remapping] Here we found 150 remaps!
+[Try Remapping] Here we found 139 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 131 remaps!
+[Try Remapping] Here we found 99 remaps!
+[Try Remapping] Here we found 139 remaps!
+[Try Remapping] Here we found 63 remaps!
+[Try Remapping] Here we found 132 remaps!
+[Try Remapping] Here we found 71 remaps!
+[Try Remapping] Here we found 30 remaps!
+[Try Remapping] Here we found 94 remaps!
+[Try Remapping] Here we found 84 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 73 remaps!
+[Try Remapping] Here we found 84 remaps!
+[Try Remapping] Here we found 86 remaps!
+[Try Remapping] Here we found 108 remaps!
+[Try Remapping] Here we found 102 remaps!
+[Try Remapping] Here we found 112 remaps!
+[Try Remapping] Here we found 103 remaps!
+[Try Remapping] Here we found 55 remaps!
+[Try Remapping] Here we found 120 remaps!
+[Try Remapping] Here we found 170 remaps!
+[Try Remapping] Here we found 108 remaps!
+[Try Remapping] Here we found 85 remaps!
+[Try Remapping] Here we found 174 remaps!
+[Try Remapping] Here we found 90 remaps!
+[Try Remapping] Here we found 67 remaps!
+[Try Remapping] Here we found 107 remaps!
+[Try Remapping] Here we found 58 remaps!
+[Try Remapping] Here we found 48 remaps!
+[Try Remapping] Here we found 50 remaps!
+[Try Remapping] Here we found 49 remaps!
+[Try Remapping] Here we found 45 remaps!
+[Try Remapping] Here we found 27 remaps!
+[Try Remapping] Here we found 57 remaps!
+[Try Remapping] Here we found 30 remaps!
+[Try Remapping] Here we found 26 remaps!
+[Try Remapping] Here we found 39 remaps!
+[Try Remapping] Here we found 30 remaps!
+[Try Remapping] Here we found 5 remaps!
+[Try Remapping] Here we found 24 remaps!
+[Try Remapping] Here we found 53 remaps!
+[Try Remapping] Here we found 14 remaps!
+[Try Remapping] Here we found 16 remaps!
+[Try Remapping] Here we found 13 remaps!
+[Try Remapping] Here we found 23 remaps!
+[Try Remapping] Here we found 40 remaps!
+[Try Remapping] Here we found 22 remaps!
+[Try Remapping] Here we found 8 remaps!
+[Try Remapping] Here we found 3 remaps!
+[Try Remapping] Here we found 2 remaps!
+[Try Remapping] Here we found 1 remaps!
+[Try Remapping] Here we found 5 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[Try Remapping] Here we found 200 remaps!
+[SNIPER] Disabling performance models
+[SNIPER] Leaving ROI after 5317.47 seconds
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[Potetial Error] tACT > tTOT
+[SNIPER] Simulated 2294.4M instructions, 1928.8M cycles, 1.19 IPC
+[SNIPER] Simulation speed 430.5 KIPS (107.6 KIPS / target core - 9291.3ns/instr)
+[SNIPER] Sampling: executed 14.67% of simulated time in detailed mode
+[SNIPER] Setting instrumentation mode to FAST_FORWARD
+[HOOKS] Leaving ROI
+
+                 PROCESS STATISTICS
+            Computation      Transpose     Transpose
+ Proc          Time            Time        Fraction
+    0         997344271     1558076773       1.56223
+
+                 TIMING INFORMATION
+Start time                        :       2083441314
+Initialization finish time        :       -100678272
+Overall finish time               :        896665999
+Total time with initialization    :      -1186775315
+Total time without initialization :        997344271
+Overall transpose time            :       1558076773
+Overall transpose fraction        :          1.56223
+
+
+ ***** [DRAM_CACHE_Result] *****
+
+*** DRAM Total Access: 18881474, miss: 1776764, miss rate: 0.0941009
+*** DRAM Total Access In ROI: 233352271, miss: 216214890, miss rate: 0.92656
+*** DRAM Remap Times: 206250 invalid times, 1458049 total invalid_blocks, 0 migrate times, 0 total migrate blocks.
+*** DRAM Statistics: 2005540425 reads, 649475351 writes, 2129904406 row hits, 108743025 ACT time, 108743025 PRE time, 88949179 RD time, 19793817 WR time.
+
+ ***** [DRAM_CACHE_Result] *****
+
+[RAMULATOR OUTPUT]
+
+**Total Ticks: 549180288
+
+**Serving Request**
+Channel_0: serving reads(884600), serving writes(276340).
+Channel_1: serving reads(882232), serving writes(272844).
+Channel_2: serving reads(844559), serving writes(262494).
+Channel_3: serving reads(888514), serving writes(274581).
+Channel_4: serving reads(890617), serving writes(275334).
+Channel_5: serving reads(893221), serving writes(279392).
+Channel_6: serving reads(842011), serving writes(259740).
+Channel_7: serving reads(898313), serving writes(280039).
+Channel_8: serving reads(885473), serving writes(285442).
+Channel_9: serving reads(894004), serving writes(281712).
+Channel_10: serving reads(860331), serving writes(269719).
+Channel_11: serving reads(902726), serving writes(280183).
+Channel_12: serving reads(902487), serving writes(289393).
+Channel_13: serving reads(894859), serving writes(288458).
+Channel_14: serving reads(849349), serving writes(273938).
+Channel_15: serving reads(1080929), serving writes(357618).
+Channel_16: serving reads(1137920), serving writes(392474).
+Channel_17: serving reads(1136932), serving writes(385039).
+Channel_18: serving reads(1090800), serving writes(372623).
+Channel_19: serving reads(1118528), serving writes(361245).
+Channel_20: serving reads(997899), serving writes(334028).
+Channel_21: serving reads(887265), serving writes(286514).
+Channel_22: serving reads(836050), serving writes(270575).
+Channel_23: serving reads(883833), serving writes(281244).
+Channel_24: serving reads(872237), serving writes(287617).
+Channel_25: serving reads(888565), serving writes(289969).
+Channel_26: serving reads(836963), serving writes(272229).
+Channel_27: serving reads(879040), serving writes(279264).
+Channel_28: serving reads(890404), serving writes(288863).
+Channel_29: serving reads(878352), serving writes(282389).
+Channel_30: serving reads(832126), serving writes(269484).
+Channel_31: serving reads(888151), serving writes(281000).
+[RAMULATOR OUTPUT]
+
+----------[STAT_STORE_UNIT]-----------
+Hot Access: 7215952, Cool Access: 32735258
+----------[STAT_STORE_UNIT]-----------
+
+ ***** [REF/AC_Result] *****
+/*BANK*/0->0: cool access (202280), hot access (0).
+/*BANK*/0->1: cool access (231945), hot access (0).
+/*BANK*/0->2: cool access (230500), hot access (0).
+/*BANK*/0->3: cool access (227455), hot access (0).
+/*BANK*/0->4: cool access (228272), hot access (0).
+/*BANK*/0->5: cool access (210503), hot access (0).
+/*BANK*/0->6: cool access (207199), hot access (0).
+/*BANK*/0->7: cool access (191524), hot access (0).
+/*BANK*/1->0: cool access (216113), hot access (0).
+/*BANK*/1->1: cool access (220221), hot access (0).
+/*BANK*/1->2: cool access (223653), hot access (0).
+/*BANK*/1->3: cool access (226901), hot access (0).
+/*BANK*/1->4: cool access (210666), hot access (0).
+/*BANK*/1->5: cool access (209180), hot access (0).
+/*BANK*/1->6: cool access (206503), hot access (0).
+/*BANK*/1->7: cool access (207329), hot access (0).
+/*BANK*/2->0: cool access (193183), hot access (0).
+/*BANK*/2->1: cool access (214353), hot access (0).
+/*BANK*/2->2: cool access (226297), hot access (0).
+/*BANK*/2->3: cool access (214393), hot access (0).
+/*BANK*/2->4: cool access (215386), hot access (0).
+/*BANK*/2->5: cool access (198263), hot access (0).
+/*BANK*/2->6: cool access (199776), hot access (0).
+/*BANK*/2->7: cool access (188232), hot access (0).
+/*BANK*/3->0: cool access (215945), hot access (0).
+/*BANK*/3->1: cool access (232900), hot access (0).
+/*BANK*/3->2: cool access (219504), hot access (0).
+/*BANK*/3->3: cool access (216301), hot access (0).
+/*BANK*/3->4: cool access (220226), hot access (0).
+/*BANK*/3->5: cool access (219432), hot access (0).
+/*BANK*/3->6: cool access (206211), hot access (0).
+/*BANK*/3->7: cool access (204124), hot access (0).
+/*BANK*/4->0: cool access (222905), hot access (0).
+/*BANK*/4->1: cool access (226995), hot access (0).
+/*BANK*/4->2: cool access (237047), hot access (0).
+/*BANK*/4->3: cool access (221066), hot access (0).
+/*BANK*/4->4: cool access (221369), hot access (0).
+/*BANK*/4->5: cool access (203939), hot access (0).
+/*BANK*/4->6: cool access (200594), hot access (0).
+/*BANK*/4->7: cool access (202206), hot access (0).
+/*BANK*/5->0: cool access (227213), hot access (0).
+/*BANK*/5->1: cool access (228541), hot access (0).
+/*BANK*/5->2: cool access (222604), hot access (0).
+/*BANK*/5->3: cool access (230127), hot access (0).
+/*BANK*/5->4: cool access (228711), hot access (0).
+/*BANK*/5->5: cool access (217286), hot access (0).
+/*BANK*/5->6: cool access (197207), hot access (0).
+/*BANK*/5->7: cool access (197872), hot access (0).
+/*BANK*/6->0: cool access (205743), hot access (0).
+/*BANK*/6->1: cool access (219839), hot access (0).
+/*BANK*/6->2: cool access (215845), hot access (0).
+/*BANK*/6->3: cool access (211639), hot access (0).
+/*BANK*/6->4: cool access (212575), hot access (0).
+/*BANK*/6->5: cool access (190065), hot access (0).
+/*BANK*/6->6: cool access (193650), hot access (0).
+/*BANK*/6->7: cool access (192105), hot access (0).
+/*BANK*/7->0: cool access (225060), hot access (0).
+/*BANK*/7->1: cool access (230897), hot access (0).
+/*BANK*/7->2: cool access (232235), hot access (0).
+/*BANK*/7->3: cool access (223961), hot access (0).
+/*BANK*/7->4: cool access (224404), hot access (0).
+/*BANK*/7->5: cool access (219088), hot access (0).
+/*BANK*/7->6: cool access (198291), hot access (0).
+/*BANK*/7->7: cool access (207528), hot access (0).
+/*BANK*/8->0: cool access (65542), hot access (154293).
+/*BANK*/8->1: cool access (67010), hot access (141443).
+/*BANK*/8->2: cool access (142788), hot access (72366).
+/*BANK*/8->3: cool access (189209), hot access (29382).
+/*BANK*/8->4: cool access (222222), hot access (0).
+/*BANK*/8->5: cool access (208426), hot access (0).
+/*BANK*/8->6: cool access (206994), hot access (0).
+/*BANK*/8->7: cool access (234686), hot access (0).
+/*BANK*/9->0: cool access (154564), hot access (83359).
+/*BANK*/9->1: cool access (110397), hot access (104222).
+/*BANK*/9->2: cool access (213038), hot access (16552).
+/*BANK*/9->3: cool access (202655), hot access (24083).
+/*BANK*/9->4: cool access (204879), hot access (0).
+/*BANK*/9->5: cool access (212038), hot access (0).
+/*BANK*/9->6: cool access (198842), hot access (0).
+/*BANK*/9->7: cool access (220795), hot access (0).
+/*BANK*/10->0: cool access (70256), hot access (150281).
+/*BANK*/10->1: cool access (75774), hot access (132391).
+/*BANK*/10->2: cool access (179349), hot access (35480).
+/*BANK*/10->3: cool access (189935), hot access (21144).
+/*BANK*/10->4: cool access (204456), hot access (0).
+/*BANK*/10->5: cool access (204354), hot access (0).
+/*BANK*/10->6: cool access (188697), hot access (0).
+/*BANK*/10->7: cool access (215301), hot access (0).
+/*BANK*/11->0: cool access (166207), hot access (64415).
+/*BANK*/11->1: cool access (204460), hot access (29188).
+/*BANK*/11->2: cool access (226918), hot access (0).
+/*BANK*/11->3: cool access (220183), hot access (0).
+/*BANK*/11->4: cool access (205711), hot access (0).
+/*BANK*/11->5: cool access (211686), hot access (0).
+/*BANK*/11->6: cool access (207885), hot access (0).
+/*BANK*/11->7: cool access (219820), hot access (0).
+/*BANK*/12->0: cool access (51775), hot access (154058).
+/*BANK*/12->1: cool access (56545), hot access (151898).
+/*BANK*/12->2: cool access (56547), hot access (167083).
+/*BANK*/12->3: cool access (63088), hot access (155933).
+/*BANK*/12->4: cool access (178134), hot access (34914).
+/*BANK*/12->5: cool access (201850), hot access (7430).
+/*BANK*/12->6: cool access (195996), hot access (0).
+/*BANK*/12->7: cool access (267487), hot access (0).
+/*BANK*/13->0: cool access (63611), hot access (157661).
+/*BANK*/13->1: cool access (56422), hot access (151591).
+/*BANK*/13->2: cool access (110924), hot access (105660).
+/*BANK*/13->3: cool access (70268), hot access (135565).
+/*BANK*/13->4: cool access (214182), hot access (0).
+/*BANK*/13->5: cool access (212607), hot access (0).
+/*BANK*/13->6: cool access (201524), hot access (0).
+/*BANK*/13->7: cool access (261818), hot access (0).
+/*BANK*/14->0: cool access (53428), hot access (152723).
+/*BANK*/14->1: cool access (58955), hot access (134740).
+/*BANK*/14->2: cool access (61034), hot access (141923).
+/*BANK*/14->3: cool access (72584), hot access (127011).
+/*BANK*/14->4: cool access (187626), hot access (7007).
+/*BANK*/14->5: cool access (204553), hot access (0).
+/*BANK*/14->6: cool access (187864), hot access (0).
+/*BANK*/14->7: cool access (254959), hot access (0).
+/*BANK*/15->0: cool access (309736), hot access (329932).
+/*BANK*/15->1: cool access (113335), hot access (111149).
+/*BANK*/15->2: cool access (200974), hot access (30619).
+/*BANK*/15->3: cool access (220217), hot access (0).
+/*BANK*/15->4: cool access (214475), hot access (0).
+/*BANK*/15->5: cool access (210609), hot access (0).
+/*BANK*/15->6: cool access (207335), hot access (0).
+/*BANK*/15->7: cool access (270476), hot access (0).
+/*BANK*/16->0: cool access (136836), hot access (594256).
+/*BANK*/16->1: cool access (56156), hot access (171727).
+/*BANK*/16->2: cool access (55677), hot access (181853).
+/*BANK*/16->3: cool access (72573), hot access (152201).
+/*BANK*/16->4: cool access (199245), hot access (14528).
+/*BANK*/16->5: cool access (196315), hot access (7717).
+/*BANK*/16->6: cool access (201249), hot access (0).
+/*BANK*/16->7: cool access (350203), hot access (0).
+/*BANK*/17->0: cool access (193105), hot access (574963).
+/*BANK*/17->1: cool access (56782), hot access (183785).
+/*BANK*/17->2: cool access (111232), hot access (108662).
+/*BANK*/17->3: cool access (136542), hot access (80809).
+/*BANK*/17->4: cool access (209681), hot access (0).
+/*BANK*/17->5: cool access (217691), hot access (0).
+/*BANK*/17->6: cool access (195538), hot access (0).
+/*BANK*/17->7: cool access (297027), hot access (0).
+/*BANK*/18->0: cool access (160408), hot access (563326).
+/*BANK*/18->1: cool access (54128), hot access (162094).
+/*BANK*/18->2: cool access (77058), hot access (140805).
+/*BANK*/18->3: cool access (92224), hot access (116980).
+/*BANK*/18->4: cool access (196415), hot access (7492).
+/*BANK*/18->5: cool access (200474), hot access (0).
+/*BANK*/18->6: cool access (194823), hot access (0).
+/*BANK*/18->7: cool access (304204), hot access (0).
+/*BANK*/19->0: cool access (217081), hot access (564150).
+/*BANK*/19->1: cool access (191395), hot access (28409).
+/*BANK*/19->2: cool access (194752), hot access (29934).
+/*BANK*/19->3: cool access (222502), hot access (0).
+/*BANK*/19->4: cool access (211165), hot access (0).
+/*BANK*/19->5: cool access (203715), hot access (0).
+/*BANK*/19->6: cool access (210041), hot access (0).
+/*BANK*/19->7: cool access (241385), hot access (0).
+/*BANK*/20->0: cool access (85714), hot access (363380).
+/*BANK*/20->1: cool access (58379), hot access (155521).
+/*BANK*/20->2: cool access (56834), hot access (159647).
+/*BANK*/20->3: cool access (65663), hot access (149191).
+/*BANK*/20->4: cool access (191364), hot access (14240).
+/*BANK*/20->5: cool access (207297), hot access (7616).
+/*BANK*/20->6: cool access (200729), hot access (0).
+/*BANK*/20->7: cool access (292928), hot access (0).
+/*BANK*/21->0: cool access (58959), hot access (161283).
+/*BANK*/21->1: cool access (57974), hot access (157480).
+/*BANK*/21->2: cool access (120880), hot access (99742).
+/*BANK*/21->3: cool access (106283), hot access (99100).
+/*BANK*/21->4: cool access (217605), hot access (0).
+/*BANK*/21->5: cool access (208546), hot access (0).
+/*BANK*/21->6: cool access (197204), hot access (0).
+/*BANK*/21->7: cool access (250047), hot access (0).
+/*BANK*/22->0: cool access (55034), hot access (137922).
+/*BANK*/22->1: cool access (53986), hot access (148744).
+/*BANK*/22->2: cool access (61026), hot access (143747).
+/*BANK*/22->3: cool access (98677), hot access (100344).
+/*BANK*/22->4: cool access (189669), hot access (7175).
+/*BANK*/22->5: cool access (199107), hot access (0).
+/*BANK*/22->6: cool access (193437), hot access (0).
+/*BANK*/22->7: cool access (240075), hot access (0).
+/*BANK*/23->0: cool access (76718), hot access (145986).
+/*BANK*/23->1: cool access (145042), hot access (79960).
+/*BANK*/23->2: cool access (198691), hot access (23951).
+/*BANK*/23->3: cool access (213961), hot access (0).
+/*BANK*/23->4: cool access (212801), hot access (0).
+/*BANK*/23->5: cool access (215741), hot access (0).
+/*BANK*/23->6: cool access (200224), hot access (0).
+/*BANK*/23->7: cool access (220452), hot access (0).
+/*BANK*/24->0: cool access (49722), hot access (147407).
+/*BANK*/24->1: cool access (56539), hot access (148591).
+/*BANK*/24->2: cool access (55781), hot access (146342).
+/*BANK*/24->3: cool access (57846), hot access (159114).
+/*BANK*/24->4: cool access (156005), hot access (47746).
+/*BANK*/24->5: cool access (193962), hot access (7419).
+/*BANK*/24->6: cool access (197191), hot access (0).
+/*BANK*/24->7: cool access (283031), hot access (0).
+/*BANK*/25->0: cool access (55340), hot access (160037).
+/*BANK*/25->1: cool access (57593), hot access (153403).
+/*BANK*/25->2: cool access (85943), hot access (115690).
+/*BANK*/25->3: cool access (56848), hot access (162347).
+/*BANK*/25->4: cool access (206453), hot access (0).
+/*BANK*/25->5: cool access (215359), hot access (7482).
+/*BANK*/25->6: cool access (208560), hot access (0).
+/*BANK*/25->7: cool access (258223), hot access (0).
+/*BANK*/26->0: cool access (57264), hot access (150679).
+/*BANK*/26->1: cool access (54323), hot access (144167).
+/*BANK*/26->2: cool access (52844), hot access (145131).
+/*BANK*/26->3: cool access (56777), hot access (131941).
+/*BANK*/26->4: cool access (194366), hot access (13431).
+/*BANK*/26->5: cool access (192778), hot access (0).
+/*BANK*/26->6: cool access (191309), hot access (0).
+/*BANK*/26->7: cool access (250596), hot access (0).
+/*BANK*/27->0: cool access (56598), hot access (156701).
+/*BANK*/27->1: cool access (101578), hot access (107677).
+/*BANK*/27->2: cool access (196435), hot access (32857).
+/*BANK*/27->3: cool access (214047), hot access (8434).
+/*BANK*/27->4: cool access (211721), hot access (0).
+/*BANK*/27->5: cool access (212036), hot access (0).
+/*BANK*/27->6: cool access (202362), hot access (0).
+/*BANK*/27->7: cool access (221228), hot access (0).
+/*BANK*/28->0: cool access (57469), hot access (152097).
+/*BANK*/28->1: cool access (57919), hot access (156534).
+/*BANK*/28->2: cool access (56397), hot access (158930).
+/*BANK*/28->3: cool access (57812), hot access (160859).
+/*BANK*/28->4: cool access (198503), hot access (7820).
+/*BANK*/28->5: cool access (205429), hot access (0).
+/*BANK*/28->6: cool access (210595), hot access (0).
+/*BANK*/28->7: cool access (264575), hot access (0).
+/*BANK*/29->0: cool access (57884), hot access (147197).
+/*BANK*/29->1: cool access (57564), hot access (159602).
+/*BANK*/29->2: cool access (159564), hot access (62636).
+/*BANK*/29->3: cool access (168993), hot access (46477).
+/*BANK*/29->4: cool access (216740), hot access (0).
+/*BANK*/29->5: cool access (207227), hot access (0).
+/*BANK*/29->6: cool access (199559), hot access (0).
+/*BANK*/29->7: cool access (236790), hot access (0).
+/*BANK*/30->0: cool access (53614), hot access (150156).
+/*BANK*/30->1: cool access (53092), hot access (141865).
+/*BANK*/30->2: cool access (60768), hot access (138197).
+/*BANK*/30->3: cool access (102289), hot access (92607).
+/*BANK*/30->4: cool access (199260), hot access (0).
+/*BANK*/30->5: cool access (200330), hot access (0).
+/*BANK*/30->6: cool access (184961), hot access (0).
+/*BANK*/30->7: cool access (244127), hot access (0).
+/*BANK*/31->0: cool access (63308), hot access (160018).
+/*BANK*/31->1: cool access (211303), hot access (14961).
+/*BANK*/31->2: cool access (216004), hot access (8464).
+/*BANK*/31->3: cool access (227715), hot access (0).
+/*BANK*/31->4: cool access (211810), hot access (0).
+/*BANK*/31->5: cool access (214947), hot access (0).
+/*BANK*/31->6: cool access (205441), hot access (0).
+/*BANK*/31->7: cool access (215800), hot access (0).
+{Summary}: 13059232 Hot Accesses, 45006508 Cool Accesses.
+
+ ***** [REF/AC_Result] *****
+                     Power     Energy    Energy %
+  core-core        24.22 W     2.62  J     29.99%
+  core-ifetch       4.71 W     0.51  J      5.83%
+  core-alu          1.69 W     0.18  J      2.09%
+  core-int          3.20 W     0.35  J      3.96%
+  core-fp           4.86 W     0.52  J      6.01%
+  core-mem          4.11 W     0.44  J      5.09%
+  core-other        3.79 W     0.41  J      4.70%
+  icache            3.51 W     0.38  J      4.35%
+  dcache            8.88 W     0.96  J     11.00%
+  l2                1.86 W     0.20  J      2.30%
+  l3                3.60 W     0.39  J      4.46%
+  dram             16.31 W     1.76  J     20.19%
+  other             0.03 W     3.53 mJ      0.04%
+
+  core             46.57 W     5.03  J     57.66%
+  cache            17.86 W     1.93  J     22.11%
+  total            80.77 W     8.72  J    100.00%
+Warning: Unable to run gnuplot to create cpi stack graphs.  Maybe gnuplot is not installed?
+[SNIPER] End
+[SNIPER] Elapsed time: 7449.79 seconds
+[SNIPER] Running McPAT
+[SPLASH] [----------    End of output    ----------]
+[SPLASH] Done.
+/root/micro/workplace/results/fft_large_100us_remap
