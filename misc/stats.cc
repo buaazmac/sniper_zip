@@ -197,6 +197,9 @@ StatsManager::init()
    m_last_record_time = SubsecondTime::Zero();
    m_record_interval = SubsecondTime::Zero();
 
+   /* Initialize remap interval*/
+   RemapInterval = SubsecondTime::US(50);
+
    first_ttrace = false;
 
 	/*End Init*/
@@ -785,9 +788,9 @@ StatsManager::updateCurrentTime(SubsecondTime t)
 	}
 	SubsecondTime time_elasped = m_current_time - m_last_remap_time;
 	if (time_elasped > RemapInterval) {
-		//std::cout << "Here a remap checking happens at " << m_current_time.getUS() << std::endl;
 		m_last_remap_time = m_current_time;
-		m_stacked_dram_unison->tryRemapping();
+		if (m_stacked_dram_unison->enter_roi)
+			m_stacked_dram_unison->tryRemapping();
 	}
 	
 }

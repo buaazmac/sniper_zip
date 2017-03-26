@@ -251,7 +251,21 @@ StackedDramPerfUnison::getAccessLatency(
 	*/
 	// We may need to tick memory during idle time
 	UInt64 interval_ns = pkt_time.getNS() - last_req.getNS();
-	interval_ns /= int(m_dram_model->tCK);
+	UInt64 clk_elasped = interval_ns / int(m_dram_model->tCK);
+	if (pkt_time < last_req) {
+		clk_elasped = 0;
+	}
+	if (clk_elasped > 1e6) {
+		std::cout << "[Ramulator] Too many ticks required!\n";
+		clk_elasped = 1e6;
+	}
+	if (first_req) {
+		first_req = false;
+	} else {
+		for (UInt64 i = 0; i < clk_elasped; i++) {
+			m_dram_model->tickOnce();
+		}
+	}
 	/* Set the current time for ramulator
 	TODO: More concrete 
 	*/
@@ -322,8 +336,9 @@ StackedDramPerfUnison::checkTemperature(UInt32 vault_i, UInt32 bank_i)
 void
 StackedDramPerfUnison::tryRemapping()
 {
+	if (!enter_roi) return;
+
 	UInt32 remap_times = m_remap_manager->tryRemapping(true);
-	//std::cout << "[REMAP_MAN] Here happens " << remap_times << " remaps!" << std::endl;
 	remapped = true;
 }
 
@@ -371,26 +386,28 @@ StackedDramPerfUnison::checkDramValid(bool *valid_arr, UInt32* b_valid_arr, UInt
 void
 StackedDramPerfUnison::clearRemappingStat()
 {
-	m_remap_manager->clearRemappingStat();
+	m_remap_manager->finishRemapping();
+	/* reset Remapping after each remap interval */
+	m_remap_manager->resetStats();
 }
 
 void
 StackedDramPerfUnison::updateStats()
 {
 	/* STAT_DEBUG*/
-	int memory_remaining_ticks = m_dram_model->interval_ticks;
-	/*
-	std::cout << "[update stats]------------" << std::endl;
-	std::cout << "---tot_reads: " << tot_reads
-			  << "---tot_writes: " << tot_writes
-			  << "---remaining mem tick: " << memory_remaining_ticks
-			  << std::endl;
-	*/
+	//int memory_remaining_ticks = m_dram_model->interval_ticks;
+
 	/* Tick Ramulator until queue empty*/
+	/*
 	for (int i = 0; i < memory_remaining_ticks; i++) {
 		m_dram_model->tickOnce();
 	}
-	m_dram_model->resetIntervalTick();
+	*/
+	//m_dram_model->resetIntervalTick();
+	/* Here we add code keeping remapping for a loner time
+	* Reset remapping after every temperature change time
+	*/
+	//m_remap_manager->resetRemapping();
 
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		VaultPerfModel* vault = m_vaults_array[i];
@@ -434,12 +451,12 @@ StackedDramPerfUnison::updateTemperature(UInt32 v, UInt32 b, UInt32 temperature,
 {
 	m_remap_manager->updateTemperature(v, b, temperature, v_temp);
 	if (temperature >= 85) {
+		enter_roi = true;
 		m_dram_model->setBankRef(v, b, true);
-		std::cout << " Set Higher Ref Freq in bank " << v << " " << b << std::endl;
+		//std::cout << " Set Higher Ref Freq in bank " << v << " " << b << std::endl;
 	} else {
 		m_dram_model->setBankRef(v, b, false);
 	}
-	enter_roi = true;
 }
 
 //-------------------------------------ALLOY-------------------------

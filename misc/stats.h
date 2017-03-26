@@ -119,7 +119,7 @@ class StatsManager
 	  StackedDramPerfMem *m_stacked_dram_mem;
 	  std::ofstream dram_stats_file;
 	  /*Record the previous statistics*/
-	  const SubsecondTime RemapInterval = SubsecondTime::US(1);
+	  SubsecondTime RemapInterval;
 	  SubsecondTime m_current_time;
 	  SubsecondTime m_last_remap_time;
 	  SubsecondTime m_last_record_time;

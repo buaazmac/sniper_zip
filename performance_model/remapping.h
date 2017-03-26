@@ -18,8 +18,10 @@
 
 #include <iostream>
 #include <fstream>
+#include <map>
+#include <vector>
 
-#define INVALID_TARGET 999
+#define INVALID_TARGET 9999999
 
 class StackedDramPerfUnison;
 
@@ -73,7 +75,7 @@ class StatStoreUnit {
 public:
 	struct stats_entry {
 		UInt32 idx, access_count;
-		bool valid, just_remapped;
+		bool valid, just_remapped, last_remapped;
 	};
 	UInt32 n_vaults, n_banks, n_rows;
 	const UInt32 temperature_threshold = 85;
@@ -82,6 +84,7 @@ public:
 	const UInt32 vault_access_threshold = 3000;
 	UInt32 n_entries;
 	struct stats_entry* m_table;
+
 	UInt32* vault_temperature;
 	UInt32* bank_temperature;
 	StatStoreUnit(UInt32 vaults, UInt32 banks, UInt32 rows);
@@ -101,6 +104,7 @@ public:
 	UInt32 getTemp(UInt32 idx);
 	bool isTooFreq(UInt32 idx);
 	bool isJustRemapped(UInt32 idx);
+	bool isLastRemapped(UInt32 idx);
 
 	UInt32 getBankTemp(UInt32 bank_i);
 	UInt32 getBankAccess(UInt32 bank_i);
@@ -130,9 +134,13 @@ public:
 	UInt32 policy;
 	UInt32 n_vaults, n_banks, n_rows;
 	UInt32 tot_access, hot_access, cool_access;
-	UInt32 tot_access_last, hot_access_last, cool_access_last;
+	UInt32 tot_access_last, hot_access_last, cool_access_last, hits_on_hot, tot_remaps, n_intervals;
 	RemappingTable *m_remap_table;
 	StatStoreUnit *m_stat_unit;
+	/* MEA map*/
+	std::map<UInt32, UInt32> mea_map;
+	const UInt32 max_mea_size = 128;
+
 	StackedDramPerfUnison* m_dram_perf_cntlr;
 
 	RemappingManager(StackedDramPerfUnison* dram_perf_cntlr, UInt32 p);
@@ -144,6 +152,7 @@ public:
 
 	bool checkRowStat(UInt32 v, UInt32 b, UInt32 r);
 	UInt32 findHottestRow();
+	UInt32 findHottestRowMEA();
 	UInt32 findTargetInVault(UInt32 src_log);
 	UInt32 findTargetCrossVault(UInt32 src_log);
 	UInt32 tryRemapping(bool remap);
@@ -155,8 +164,8 @@ public:
 	void updateTemperature(UInt32 v, UInt32 b, UInt32 temp, UInt32 v_temp);
 
 	void reset(UInt32 v, UInt32 b, UInt32 r);
-	void resetRemapping();
-	void clearRemappingStat();
+	void resetStats();
+	void finishRemapping();
 
 	bool checkMigrated(UInt32 v, UInt32 b, UInt32 r);
 	bool checkValid(UInt32 v, UInt32 b, UInt32 r);

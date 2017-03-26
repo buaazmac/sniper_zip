@@ -317,6 +317,8 @@ StackDramCacheCntlrUnison::StackDramCacheCntlrUnison(
 	m_row_size = 8;
 	// Statistics for simulating memory operation
 	cache_access = page_misses = block_misses = wb_blocks = ld_blocks = 0;
+	// Statistics for simulating remapping
+	invalid_times = invalid_blocks = migrate_times = migrate_blocks = 0;
 	// Choose Invalidation/Migration mechanism
 	remap_invalid = true;
 
@@ -355,8 +357,8 @@ StackDramCacheCntlrUnison::~StackDramCacheCntlrUnison()
 			  << ", miss: " << tot_miss_roi << ", miss rate: " << miss_rate_roi
 			  << std::endl;
 	std::cout << "*** DRAM Remap Times: " 
-			  << m_dram_perf_model->v_remap_times << " vault remaps, "
-			  << m_dram_perf_model->b_remap_times << " bank remaps."
+			  << invalid_times << " invalid times, " << invalid_blocks << " total invalid_blocks, "
+			  << migrate_times << " migrate times, " << migrate_blocks << " total migrate blocks."
 			  << std::endl;
 	std::cout << "*** DRAM Statistics: " 
 			  << m_dram_perf_model->tot_dram_reads << " reads, "
@@ -462,6 +464,7 @@ TODO:
 		/* Write Back Dirty Blocks*/
 		//dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64 * writeback_blocks, set_n, DramCntlrInterface::WRITE); 
 		dram_delay += handleDramAccess(pkt_time, 64 * writeback_blocks, set_n, DramCntlrInterface::WRITE, perf); 
+		dram_delay += handleDramAccess(pkt_time, 64 * writeback_blocks, set_n, DramCntlrInterface::READ, perf); 
 		/* Load New Blocks from Memory*/
 
 		// calculate model delay (page load): load a page (1 page = 1984 B)
@@ -571,11 +574,18 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 				if (!valid) {
 					set_wb_blocks = m_set[set_i]->invalidateContent();
 					row_wb_blocks += set_wb_blocks;
+
+					invalid_times ++;
+					invalid_blocks += set_wb_blocks;
 				} else {
 					set_valid_blocks = m_set[set_i]->getValidBlocks();
 					row_valid_blocks += set_valid_blocks;
+
+					migrate_times ++;
+					migrate_blocks += set_valid_blocks;
 				}
 				/* Latency for migration */
+				dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::READ, perf); 
 				dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE, perf); 
 				/* Latency for invalidation */
 				dram_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * set_wb_blocks);
@@ -596,6 +606,7 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 	//m_dram_perf_model->updateStats();
 
 	wb_blocks += writeback_blocks;
+	
 	return dram_delay;
 }
 
