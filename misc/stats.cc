@@ -810,7 +810,7 @@ StatsManager::getDramBankTemp(UInt32 vault_num, UInt32 bank_num)
 void
 StatsManager::recordStats(String prefix)
 {
-	std::cout << "recordStats once at " << m_current_time.getUS() << std::endl;
+	//std::cout << "recordStats once at " << m_current_time.getUS() << std::endl;
 
 	m_record_interval = m_current_time - m_last_record_time;
 	if (m_record_interval == SubsecondTime::Zero()) {

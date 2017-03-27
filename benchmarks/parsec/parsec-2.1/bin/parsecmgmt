@@ -308,7 +308,7 @@ Examples:
   nthreads=""
   submit=""
   extension=""
-  keep_rundir="yes"
+  keep_rundir=""
   while [ ! -z "$1" ]; do
     arg="$1"
     case "${arg}" in
@@ -844,13 +844,13 @@ function run_benchmark {
     echo "${oprefix} Error: Group of benchmark '${benchmark}' is unknown." | ${TEE} ${log}
     exit 1
   fi
-  #local bmrundir="${rundir}/${benchmarkgroup}/${benchmark}/run"
-  local bmrundir="${rundir}"
+  local bmrundir="${rundir}/${benchmarkgroup}/${benchmark}/run"
   local bmdir="${PARSECDIR}/pkgs/${benchmarkgroup}/${benchmark}"
   local bminputdir="${bmdir}/inputs"
   local bmoutputdir="${bmdir}/outputs"
   local bminstdir="${bmdir}/inst/${PARSECPLAT}"
   local bmparsecdir="${bmdir}/parsec"
+
 
   # Check whether selected input size is available
   if [ ! -f "${PARSECDIR}/config/${inputsize}.runconf" ]; then
@@ -892,6 +892,11 @@ function run_benchmark {
       exit 1
     fi
     echo "${oprefix} Keeping old run directory." | ${TEE} ${log}
+
+    # Copy HotSpot and ramlulator to bmrundir
+    cp -R ./HotSpot ${bmrundir}
+    cp -R ./ramulator ${bmrundir}
+
     pushd "${bmrundir}" > /dev/null
   else 
     # Set up run directory
@@ -901,8 +906,12 @@ function run_benchmark {
     fi
 
     echo "${oprefix} Setting up run directory." | ${TEE} ${log}
-    echo "Run directory: " ${bmrundir}
     ${MKDIR} ${bmrundir} | ${TEE} ${log}
+
+    # Copy HotSpot and ramlulator to bmrundir
+    cp -R ./HotSpot ${bmrundir}
+    cp -R ./ramulator ${bmrundir}
+
     pushd "${bmrundir}" > /dev/null
 
     # Determine input archive
@@ -927,6 +936,7 @@ function run_benchmark {
   CMD_RC=$?
 
   echo "${oprefix} [----------    End of output    ----------]" | ${TEE} ${log}
+  mv ${bmrundir}/test_ttrace.txt ${rundir}
 
 
   # Unpack reference output and compare

@@ -140,11 +140,16 @@ public:
 	/* MEA map*/
 	std::map<UInt32, UInt32> mea_map;
 	const UInt32 max_mea_size = 128;
+	/* More Fine-grained Results*/
+	std::vector<UInt32> hot_access_vec, hit_hot_vec, hot_remap_vec;
+	UInt32 c_hot_access, c_hit_hot, c_hot_remap;
 
 	StackedDramPerfUnison* m_dram_perf_cntlr;
 
 	RemappingManager(StackedDramPerfUnison* dram_perf_cntlr, UInt32 p);
 	~RemappingManager();
+	
+	double getAverage(std::vector<UInt32> vec);
 
 	bool getPhysicalIndex(UInt32* vault_i, UInt32* bank_i, UInt32* row_i);
 	void accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 req_times);

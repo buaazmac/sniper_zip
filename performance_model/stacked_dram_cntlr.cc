@@ -255,9 +255,9 @@ StackedDramPerfUnison::getAccessLatency(
 	if (pkt_time < last_req) {
 		clk_elasped = 0;
 	}
-	if (clk_elasped > 1e6) {
+	if (clk_elasped > 1e4) {
 		std::cout << "[Ramulator] Too many ticks required!\n";
-		clk_elasped = 1e6;
+		clk_elasped = 1e4;
 	}
 	if (first_req) {
 		first_req = false;
@@ -338,7 +338,7 @@ StackedDramPerfUnison::tryRemapping()
 {
 	if (!enter_roi) return;
 
-	UInt32 remap_times = m_remap_manager->tryRemapping(true);
+	UInt32 remap_times = m_remap_manager->tryRemapping(false);
 	remapped = true;
 }
 

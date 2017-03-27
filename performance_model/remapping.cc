@@ -318,6 +318,12 @@ RemappingManager::RemappingManager(StackedDramPerfUnison* dram_perf_cntlr, UInt3
 	hits_on_hot = 0;
 	tot_remaps = 0;
 	n_intervals = 0;
+
+	mea_map.clear();
+	hot_access_vec.clear();
+	hit_hot_vec.clear();
+	hot_remap_vec.clear();
+	c_hot_access = c_hit_hot = c_hot_remap = 0;
 }
 
 RemappingManager::~RemappingManager()
@@ -326,9 +332,40 @@ RemappingManager::~RemappingManager()
 	std::cout << "\nHot Access: " << hot_access << ", Cool Access: " << cool_access << std::endl;
 	std::cout << "\nHits on previous hot rows: " << hits_on_hot << std::endl;
 	std::cout << "\nTotal remap times: " << tot_remaps << ", Total number of intervals: " << n_intervals << std::endl;
+	std::cout << "\nHot Access: \n";
+	std::cout << getAverage(hot_access_vec);
+	/*
+	for (auto n_hots : hot_access_vec) {
+		std::cout << n_hots << ' ';
+	} */
+	std::cout << "\n\nHit on Previous Hot:\n";
+	std::cout << getAverage(hit_hot_vec);
+	/*
+	for (auto n_hits : hit_hot_vec) {
+		std::cout << n_hits << ' ';
+	} */
+	std::cout << "\n\nRemap Times:\n";
+	std::cout << getAverage(hot_remap_vec);
+	/*
+	for (auto n_remaps : hot_remap_vec) {
+		std::cout << n_remaps << ' ';
+	} */
+	std::cout << std::endl;
 	std::cout << "\n----------[STAT_STORE_UNIT]-----------\n";
 	delete m_remap_table;
 	delete m_stat_unit;
+}
+
+double
+RemappingManager::getAverage(std::vector<UInt32> vec)
+{
+	double sum = 0, num = 0;
+	if (vec.size() == 0) return 0;
+	num = double(vec.size());
+	for (auto item : vec) {
+		sum += double(item);
+	}
+	return sum / num;
 }
 
 bool
@@ -349,11 +386,15 @@ RemappingManager::accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 
 	UInt32 bank_idx = vault_i * n_banks + bank_i;
 	UInt32 bank_temp = m_stat_unit->getBankTemp(bank_idx);
 
-	if (m_stat_unit->isLastRemapped(idx)) hits_on_hot++;
+	if (m_stat_unit->isLastRemapped(idx)){
+		hits_on_hot += req_times;
+		c_hit_hot += req_times;
+	}
 
 	/* Check if there is a hot row */
 	if (bank_temp > 85) {
 		hot_access += req_times;
+		c_hot_access += req_times;
 		
 		if (mea_map.find(idx) != mea_map.end()) {
 			mea_map[idx] ++;
@@ -411,6 +452,8 @@ RemappingManager::issueRowRemap(UInt32 src, UInt32 des)
 	bool invalid = false;
 	m_remap_table->remapRow(src, des, invalid);
 	m_stat_unit->remapRow(src, des);
+
+	c_hot_remap ++;
 }
 
 bool
@@ -486,7 +529,7 @@ RemappingManager::findHottestRowMEA()
 	}
 	if (max_count != 0) {
 		mea_map.erase(max_idx);
-		return INVALID_TARGET;
+		return max_idx;
 	}
 	UInt32 src_idx = m_remap_table->getLogIdx(max_idx);
 	return src_idx;
@@ -533,7 +576,7 @@ RemappingManager::findTargetInVault(UInt32 src_log)
 UInt32
 RemappingManager::findTargetCrossVault(UInt32 src_log)
 {
-	std::cout << "Here we start to find target in other vaults!\n";
+	std::cout << "[CROSS] Here we start to find target in other vaults!\n";
 
 	UInt32 target = INVALID_TARGET;
 	if (src_log == INVALID_TARGET) return INVALID_TARGET;
@@ -565,7 +608,7 @@ RemappingManager::tryRemapping(bool remap)
 {
 	/* If we have not entered ROI, just return*/
 
-	int max_remap_times = 200; 
+	int max_remap_times = 15; 
 
 	if (remap == false) return 0;
 	int remap_times = 0;
@@ -587,7 +630,6 @@ RemappingManager::tryRemapping(bool remap)
 			break;
 
 		issueRowRemap(src, target);
-
 
 		//std::cout << "[Remapping] Here we found a remap: src(" << src
 		//	  << "), target(" << target << ")\n";
@@ -633,12 +675,16 @@ RemappingManager::resetStats()
 	for (UInt32 i = 0; i < m_stat_unit->n_entries; i++) {
 		m_stat_unit->clear(i);
 	}
-	//mea_map.clear();
+	mea_map.clear();
 }
 
 void
 RemappingManager::finishRemapping()
 {
+	hot_access_vec.push_back(c_hot_access);
+	hit_hot_vec.push_back(c_hit_hot);
+	hot_remap_vec.push_back(c_hot_remap);
+	c_hot_access = c_hit_hot = c_hot_remap = 0;
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		for (UInt32 j = 0; j < n_banks; j++) {
 			for (UInt32 k = 0; k < n_rows; k++) {
