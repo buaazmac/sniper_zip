@@ -84,7 +84,8 @@ StatsManager::~StatsManager()
 	   for (int j = 0; j < 8; j++) {
 		   std::cout << "/*BANK*/" << i << "->" << j
 					 << ": cool access (" << cool_access[i][j] << "), "
-					 << "hot access (" << hot_access[i][j] << ")." << std::endl;
+					 << "hot access (" << hot_access[i][j] << "), " 
+					 << "error acces (" << err_access[i][j] << ")." << std::endl;
 		   tot_hot_access += hot_access[i][j];
 		   tot_cool_access += cool_access[i][j];
 	   }
@@ -189,6 +190,7 @@ StatsManager::init()
 
 		   hot_access[i][j] = 0;
 		   cool_access[i][j] = 0;
+		   err_access[i][j] = 0;
 	   }
    }
    /*Initialize current time*/
@@ -198,7 +200,7 @@ StatsManager::init()
    m_record_interval = SubsecondTime::Zero();
 
    /* Initialize remap interval*/
-   RemapInterval = SubsecondTime::US(50);
+   RemapInterval = SubsecondTime::US(10);
 
    first_ttrace = false;
 
@@ -236,7 +238,7 @@ StatsManager::computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, Subsecond
 {
 	double act_t = double(tACT.getFS()), pre_t = double(tPRE.getFS()), read_t = double(tRD.getFS()), write_t = double(tWR.getFS()), tot_time = double(totT.getFS());
 	if (act_t > tot_time) {
-		std::cout << "[Potetial Error] tACT > tTOT\n";
+		//std::cout << "[Potetial Error] tACT > tTOT\n";
 		act_t = tot_time;
 	}
 	double read_ratio = 0,
@@ -503,6 +505,7 @@ StatsManager::dumpHotspotInput()
 		pt_file << std::endl;
 
 		/* Here we output power trace for drawing picture*/
+/*
 		power_trace_log << power_L3;
 		for (int i = 0; i < 4; i++) {
 			power_trace_log << "\t" << power_exe[i] << "\t" << power_ifetch[i] 
@@ -518,6 +521,7 @@ StatsManager::dumpHotspotInput()
 			}
 		}
 		power_trace_log << std::endl;
+*/
 		/**/
 	}
 //for (int pt_it = 0; pt_it < 2; pt_it++) {
@@ -722,7 +726,8 @@ StatsManager::callHotSpot()
 	max_temp = max_cntlr_temp = max_bank_temp = 0;
 	char *s1, *s2, *s3;
 
-	temp_trace_log << "-------trace_" << ttrace_num << "-----" << std::endl;
+	//temp_trace_log << "-------trace_" << ttrace_num << "-----" << std::endl;
+
 	ttrace_num ++;
 
 	for (int i = 0; i < unit_num; i++) {
@@ -742,16 +747,19 @@ StatsManager::callHotSpot()
 				s3 = unit_names[i];
 			}
 		}
-		temp_trace_log << "[Sniper] UnitName: " << unit_names[i] << ", UnitTemp: " << unit_temp[i];
+		//temp_trace_log << "[Sniper] UnitName: " << unit_names[i] << ", UnitTemp: " << unit_temp[i];
 		if (i >= 25 && i < 57) {
+/*
 			temp_trace_log << ", Cntlr_" << i - 25 
 				<< " Power: " << vault_power[i-25] << ", Total Access: " << vault_access[i-25]; 
+*/
 		}
 		if (i >= 57) {
 			int v_i = (i - 57) % 32, b_i = (i - 57) / 32;
 			BankStatEntry *tmp = &bank_stats_interval[v_i][b_i];
-			temp_trace_log << ", Bank_" << v_i << "_" << b_i 
-				<< " Power: " << bank_power[v_i][b_i] << ", Total Access: " << tmp->reads + tmp->writes; 
+			/* Here we log temperature and access of banks*/
+			//temp_trace_log << unit_names[i] << ", " << unit_temp[i] 
+			//	<< ", " << tmp->reads + tmp->writes; 
 			/* (REMAP_MAN) Here We Want to Update Temperature 
 			 * Here we set vault controller temperature
 			 * to any bank in the vault (because of temperature sensor)
@@ -761,11 +769,14 @@ StatsManager::callHotSpot()
 			m_stacked_dram_unison->updateTemperature(v_i, b_i, bank_temp, vault_temp);
 			if (unit_temp[i] > 85) {
 				hot_access[v_i][b_i] += tmp->reads + tmp->writes;
+				if (unit_temp[i] > 95) {
+					err_access[v_i][b_i] += tmp->reads + tmp->writes;
+				}
 			} else {
 				cool_access[v_i][b_i] += tmp->reads + tmp->writes;
 			}
 		}
-		temp_trace_log << std::endl;
+		//temp_trace_log << std::endl;
 	}
 	int cache_reads = m_stacked_dram_unison->tot_reads,
 		cache_writes = m_stacked_dram_unison->tot_writes,
@@ -774,9 +785,11 @@ StatsManager::callHotSpot()
 	double cur_time_ms = double(m_current_time.getFS()) * 1.0e-12;
 	if (cache_misses != 0)
 		miss_rate = double(cache_misses) / double(cache_reads + cache_writes);
+/*
 	temp_trace_log << "TotAccess: " << cache_reads + cache_writes 
 				   << " MissRate: " << miss_rate  
 				   << " CurrentTIme: " << cur_time_ms << std::endl;
+*/
 	m_stacked_dram_unison->clearCacheStats();
 }
 

@@ -255,9 +255,9 @@ StackedDramPerfUnison::getAccessLatency(
 	if (pkt_time < last_req) {
 		clk_elasped = 0;
 	}
-	if (clk_elasped > 1e4) {
-		std::cout << "[Ramulator] Too many ticks required!\n";
-		clk_elasped = 1e4;
+	if (clk_elasped > 1e6) {
+		//std::cout << "[Ramulator] Too many ticks required!\n";
+		clk_elasped = 1e6;
 	}
 	if (first_req) {
 		first_req = false;
@@ -276,7 +276,8 @@ StackedDramPerfUnison::getAccessLatency(
 TODO: Here we need to handle memory request with physical index
 	   */
 	/* (REMAP_MAN) Here we update statistics store unit*/
-	m_remap_manager->accessRow(remapVault, remapBank, remapRow, req_times);
+	if (access_type != DramCntlrInterface::TRANS)
+		m_remap_manager->accessRow(remapVault, remapBank, remapRow, req_times);
 
 	/* STAT_DEBUG */
 	if (access_type == DramCntlrInterface::READ) {
@@ -303,7 +304,7 @@ TODO: Here we need to handle memory request with physical index
 				m_dram_model->tickOnce();
 				clks++;
 			}
-		} else {
+		} else if (access_type == DramCntlrInterface::WRITE) {
 			stall = !m_dram_model->writeRow(remapVault, remapBank, remapRow, 0);
 			m_dram_model->tickOnce();
 			clks++;
@@ -316,6 +317,11 @@ TODO: Here we need to handle memory request with physical index
 				m_dram_model->tickOnce();
 				clks++;
 			}
+		} else {
+			// Transfer is a 2-clocks command
+			clks += 2;
+			m_dram_model->tickOnce();
+			m_dram_model->tickOnce();
 		}
 		clks += m_dram_model->getReadLatency(remapVault);
 
@@ -338,7 +344,7 @@ StackedDramPerfUnison::tryRemapping()
 {
 	if (!enter_roi) return;
 
-	UInt32 remap_times = m_remap_manager->tryRemapping(false);
+	UInt32 remap_times = m_remap_manager->tryRemapping(true);
 	remapped = true;
 }
 
@@ -444,6 +450,10 @@ void
 StackedDramPerfUnison::clearCacheStats()
 {
 	tot_reads = tot_writes = tot_misses = 0;
+
+	/* Enable Remapping for all bank*/
+	m_remap_manager->enableAllRemap();
+	
 }
 
 void

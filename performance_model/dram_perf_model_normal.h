@@ -98,6 +98,7 @@ class DramCacheSetUnison
 
 		UInt32 getReplacementIndex();
 		UInt32 invalidateContent();
+		UInt32 getDirtyBlocks();
 		UInt32 getValidBlocks();
 		void updateReplacementIndex(UInt32);
 		void updateReplacementIndexTag(UInt32 index, IntPtr tag, IntPtr pc, IntPtr offset, UInt32 footprint);

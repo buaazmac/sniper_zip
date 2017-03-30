@@ -172,6 +172,13 @@ StatStoreUnit::clear(UInt32 idx)
 	m_table[idx].access_count = 0;
 	m_table[idx].valid = true;
 	// Here we first test all parts of DRAM only remap once
+	//m_table[idx].last_remapped = m_table[idx].just_remapped;
+	//m_table[idx].just_remapped = false;
+}
+
+void
+StatStoreUnit::enableRemap(UInt32 idx)
+{
 	m_table[idx].last_remapped = m_table[idx].just_remapped;
 	m_table[idx].just_remapped = false;
 }
@@ -189,6 +196,7 @@ StatStoreUnit::swap(UInt32 x, UInt32 y)
 void
 StatStoreUnit::remapRow(UInt32 src, UInt32 des)
 {
+	m_table[src].just_remapped = true;
 	m_table[des].just_remapped = true;
 }
 
@@ -316,7 +324,9 @@ RemappingManager::RemappingManager(StackedDramPerfUnison* dram_perf_cntlr, UInt3
 	tot_access = hot_access = cool_access = 0;
 	tot_access_last = hot_access_last = cool_access_last = 0;
 	hits_on_hot = 0;
+	hits_on_cool = 0;
 	tot_remaps = 0;
+	cross_remaps = 0;
 	n_intervals = 0;
 
 	mea_map.clear();
@@ -331,21 +341,24 @@ RemappingManager::~RemappingManager()
 	std::cout << "\n----------[STAT_STORE_UNIT]-----------\n";
 	std::cout << "\nHot Access: " << hot_access << ", Cool Access: " << cool_access << std::endl;
 	std::cout << "\nHits on previous hot rows: " << hits_on_hot << std::endl;
-	std::cout << "\nTotal remap times: " << tot_remaps << ", Total number of intervals: " << n_intervals << std::endl;
-	std::cout << "\nHot Access: \n";
-	std::cout << getAverage(hot_access_vec);
+	std::cout << "\nHits on previous cool rows: " << hits_on_cool << std::endl;
+	std::cout << "\nTotal remap times: " << tot_remaps 
+		  << ", Total Inter-Vault remaps: " << cross_remaps
+		  << ", Total number of intervals: " << n_intervals << std::endl;
+	//std::cout << "\nHot Access: \n";
+	//std::cout << getAverage(hot_access_vec);
 	/*
 	for (auto n_hots : hot_access_vec) {
 		std::cout << n_hots << ' ';
 	} */
-	std::cout << "\n\nHit on Previous Hot:\n";
-	std::cout << getAverage(hit_hot_vec);
+	//std::cout << "\n\nHit on Previous Hot:\n";
+	//std::cout << getAverage(hit_hot_vec);
 	/*
 	for (auto n_hits : hit_hot_vec) {
 		std::cout << n_hits << ' ';
 	} */
-	std::cout << "\n\nRemap Times:\n";
-	std::cout << getAverage(hot_remap_vec);
+	//std::cout << "\n\nRemap Times:\n";
+	//std::cout << getAverage(hot_remap_vec);
 	/*
 	for (auto n_remaps : hot_remap_vec) {
 		std::cout << n_remaps << ' ';
@@ -390,6 +403,9 @@ RemappingManager::accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 
 		hits_on_hot += req_times;
 		c_hit_hot += req_times;
 	}
+	if (bank_temp > 85 && m_stat_unit->isJustRemapped(idx)) {
+		hits_on_cool += req_times;
+	}
 
 	/* Check if there is a hot row */
 	if (bank_temp > 85) {
@@ -400,18 +416,19 @@ RemappingManager::accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 
 			mea_map[idx] ++;
 		} else {
 			/* Add MEA mechod */
-			std::vector<UInt32> deleted_keys;
-			for (auto i = mea_map.begin(); i != mea_map.end(); i++) {
-				i->second --;
-				if (i->second == 0) {
-					deleted_keys.push_back(i->first);
-				}
-}
-			for (auto i : deleted_keys) {
-				mea_map.erase(i);
-			}
 			if (mea_map.size() < max_mea_size) {
 				mea_map[idx] = 1;
+			} else {
+				std::vector<UInt32> deleted_keys;
+				for (auto i = mea_map.begin(); i != mea_map.end(); i++) {
+					i->second --;
+					if (i->second == 0) {
+						deleted_keys.push_back(i->first);
+					}
+				}
+				for (auto i : deleted_keys) {
+					mea_map.erase(i);
+				}
 			}
 		}
 
@@ -449,9 +466,10 @@ RemappingManager::issueRowRemap(UInt32 src, UInt32 des)
 {
 	// invalid = true: invalidation after remapping
 	// invalid = false: migration after remapping
+	UInt32 src_phy = m_remap_table->getPhyIdx(src);
 	bool invalid = false;
 	m_remap_table->remapRow(src, des, invalid);
-	m_stat_unit->remapRow(src, des);
+	m_stat_unit->remapRow(src_phy, des);
 
 	c_hot_remap ++;
 }
@@ -480,21 +498,22 @@ RemappingManager::findHottestRow()
 
 			if (bank_temp < m_stat_unit->temperature_threshold) continue;
 
-			UInt32 max_bank_access = 0, tot_bank_access = 0;
+			//UInt32 max_bank_access = 0, tot_bank_access = 0;
 
 			for (UInt32 r_i = 0; r_i < n_rows; r_i++) {
 				UInt32 phy_idx = this->translateIdx(v_i, b_i, r_i);
 				UInt32 log_idx = m_remap_table->getLogIdx(phy_idx);
 
 				bool just_remapped = m_stat_unit->isJustRemapped(phy_idx),
-					 valid = m_remap_table->getValid(log_idx);
+					 valid = m_remap_table->getValid(log_idx),
+					 migrated = m_remap_table->getMigrated(log_idx);
 				/* If this row is unavailable, we just skip it*/
-				if (!valid || just_remapped) continue;
+				if (!valid || just_remapped || migrated) continue;
 
 				UInt32 access = m_stat_unit->getAccess(phy_idx);
 
-				if (access > max_bank_access) max_bank_access = access;
-				tot_bank_access += access;
+				//if (access > max_bank_access) max_bank_access = access;
+				//tot_bank_access += access;
 
 				if (access > max_access) {
 					max_access = access;
@@ -509,6 +528,9 @@ RemappingManager::findHottestRow()
 		}
 	}
 	//std::cout << "Who is hottest? ..." << hottest << "!!\n";
+	
+	//std::cout << "[MEA]We found hottest row" << hottest << " with " << max_access << std::endl;
+
 	if (hottest == INVALID_TARGET)
 		return INVALID_TARGET;
 	UInt32 src_idx = m_remap_table->getLogIdx(hottest);
@@ -518,8 +540,11 @@ RemappingManager::findHottestRow()
 UInt32
 RemappingManager::findHottestRowMEA()
 {
-	UInt32 max_idx = 0;
-	UInt32 max_count = 0;
+	UInt32 max_idx = INVALID_TARGET;
+	UInt32 max_count = m_stat_unit->row_access_threshold;
+
+	//std::cout << "[MEA]Current we have " << mea_map.size() << " in mea map" << std::endl;
+
 	for (auto i = mea_map.begin(); i != mea_map.end(); i++) {
 		if (m_stat_unit->isJustRemapped(i->first)) continue;
 		if (i->second > max_count) {
@@ -527,10 +552,11 @@ RemappingManager::findHottestRowMEA()
 			max_count = i->second;
 		}
 	}
-	if (max_count != 0) {
-		mea_map.erase(max_idx);
-		return max_idx;
+	if (max_count == m_stat_unit->row_access_threshold) {
+		return INVALID_TARGET;
 	}
+	//std::cout << "[MEA]We found hottest row with " << max_count << std::endl;
+	mea_map.erase(max_idx);
 	UInt32 src_idx = m_remap_table->getLogIdx(max_idx);
 	return src_idx;
 }
@@ -547,6 +573,8 @@ RemappingManager::findTargetInVault(UInt32 src_log)
 	UInt32 s_lev = b / 2;
 	
 	UInt32 des_phy = (v + 1) * n_banks * n_rows - 1;
+	UInt32 src_access = m_stat_unit->getAccess(src_phy);
+	UInt32 min_access = 999999;
 
 	while (des_phy > src_phy) {
 		UInt32 des_log = m_remap_table->getLogIdx(des_phy);
@@ -558,14 +586,20 @@ RemappingManager::findTargetInVault(UInt32 src_log)
 		UInt32 d_lev = tb / 2;
 		UInt32 bank_temp = m_stat_unit->getBankTemp(tv * n_banks + tb);
 		bool just_remapped = m_stat_unit->isJustRemapped(des_phy),
-			 valid = m_remap_table->getValid(des_log);
+			 valid = m_remap_table->getValid(des_log),
+			 migrated = m_remap_table->getMigrated(des_log);
+		UInt32 des_access = m_stat_unit->getAccess(des_phy);
 		/* We also choose position higher than source and untouched */
-		if (just_remapped || !valid) {
+		if (just_remapped || !valid || migrated) {
 			continue;
 		}
+
 		if (d_lev > s_lev && bank_temp < m_stat_unit->temperature_threshold) {
-			target = des_phy;
-			break;
+			/* Here we only choose 0 access*/
+			if (des_access == 0) {
+				target = des_phy;
+				break;
+			}
 		}
 	}
 	return target;
@@ -576,10 +610,13 @@ RemappingManager::findTargetInVault(UInt32 src_log)
 UInt32
 RemappingManager::findTargetCrossVault(UInt32 src_log)
 {
-	std::cout << "[CROSS] Here we start to find target in other vaults!\n";
+	//std::cout << "[CROSS] Here we start to find target in other vaults!\n";
 
 	UInt32 target = INVALID_TARGET;
 	if (src_log == INVALID_TARGET) return INVALID_TARGET;
+
+	UInt32 src_phy = m_remap_table->getPhyIdx(src_log);
+	UInt32 src_access = m_stat_unit->getAccess(src_phy);
 	for (int b_i = n_banks - 1; b_i >= 0; b_i --) {
 		for (int v_i = 0; v_i < n_vaults; v_i ++) {
 			UInt32 phy_bank_idx = v_i * n_banks + b_i;
@@ -588,12 +625,15 @@ RemappingManager::findTargetCrossVault(UInt32 src_log)
 			for (int r_i = 0; r_i < n_rows; r_i ++) {
 				UInt32 des_phy = this->translateIdx(v_i, b_i, r_i);
 				UInt32 des_log = m_remap_table->getLogIdx(des_phy);
+				UInt32 des_access = m_stat_unit->getAccess(des_phy);
 
 				bool just_remapped = m_stat_unit->isJustRemapped(des_phy),
-					 valid = m_remap_table->getValid(des_log);
+					 valid = m_remap_table->getValid(des_log),
+					 migrated = m_remap_table->getMigrated(des_log);
 
 				/* We also choose position higher than source and untouched */
-				if (!just_remapped && valid) {
+				/* Here we only choose 0 access*/
+				if (!just_remapped && valid && !migrated && des_access == 0) {
 					target = des_phy;
 					return target;
 				}
@@ -608,9 +648,10 @@ RemappingManager::tryRemapping(bool remap)
 {
 	/* If we have not entered ROI, just return*/
 
-	int max_remap_times = 15; 
+	int max_remap_times = 5; 
 
 	if (remap == false) return 0;
+	if (hot_access_last == hot_access) return 0;
 	int remap_times = 0;
 	while (remap_times < max_remap_times) {
 		//std::cout << "hehe\n";
@@ -626,7 +667,15 @@ RemappingManager::tryRemapping(bool remap)
 			target = findTargetCrossVault(src);
 			cross = true;
 		}
-		if (src == INVALID_TARGET || target == INVALID_TARGET)
+		if (cross) cross_remaps++;
+		/*
+		UInt32 target = findTargetCrossVault(src);
+		if (target == INVALID_TARGET) {
+			target = findTargetInVault(src);
+		}
+		*/
+
+		if (target == INVALID_TARGET)
 			break;
 
 		issueRowRemap(src, target);
@@ -681,9 +730,9 @@ RemappingManager::resetStats()
 void
 RemappingManager::finishRemapping()
 {
-	hot_access_vec.push_back(c_hot_access);
-	hit_hot_vec.push_back(c_hit_hot);
-	hot_remap_vec.push_back(c_hot_remap);
+	//hot_access_vec.push_back(c_hot_access);
+	//hit_hot_vec.push_back(c_hit_hot);
+	//hot_remap_vec.push_back(c_hot_remap);
 	c_hot_access = c_hit_hot = c_hot_remap = 0;
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		for (UInt32 j = 0; j < n_banks; j++) {
@@ -691,6 +740,14 @@ RemappingManager::finishRemapping()
 				reset(i, j, k);
 			}
 		}
+	}
+}
+
+void
+RemappingManager::enableAllRemap()
+{
+	for (UInt32 i = 0; i < m_stat_unit->n_entries; i++) {
+		m_stat_unit->enableRemap(i);
 	}
 }
 
