@@ -202,10 +202,14 @@ StatsManager::init()
    last_time_point = std::chrono::steady_clock::now();
 
    /* Initialize remap interval*/
+<<<<<<< HEAD
 	// EXP_SET
    int remap_interval_us = Sim()->getCfg()->getInt("perf_model/remap_config/remap_interval");
    RemapInterval = SubsecondTime::US(remap_interval_us);
    do_remap = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/remap", false);
+=======
+   RemapInterval = SubsecondTime::US(10);
+>>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 
    first_ttrace = false;
 
@@ -562,6 +566,11 @@ StatsManager::dumpHotspotInput()
 		pt_file << std::endl;
 
 		/* Here we output power trace for drawing picture*/
+<<<<<<< HEAD
+=======
+/*
+		power_trace_log << power_L3;
+>>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 		for (int i = 0; i < 4; i++) {
 			power_trace_log << power_ialu[i] << "\t" << power_fpalu[i] 
 					<< "\t" << power_inssch[i] << "\t" << power_l1i[i]
@@ -578,6 +587,7 @@ StatsManager::dumpHotspotInput()
 			}
 		}
 		power_trace_log << std::endl;
+*/
 		/**/
 	}
 //for (int pt_it = 0; pt_it < 2; pt_it++) {
@@ -821,22 +831,56 @@ StatsManager::callHotSpot()
 	max_temp = max_cntlr_temp = max_bank_temp = 0;
 	char *s1, *s2, *s3;
 
+<<<<<<< HEAD
 	temp_trace_log << "-------trace_" << ttrace_num << "-----" << std::endl;
+=======
+	//temp_trace_log << "-------trace_" << ttrace_num << "-----" << std::endl;
+>>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 
 	ttrace_num ++;
 
 	for (int i = 0; i < unit_num; i++) {
+<<<<<<< HEAD
 		temp_trace_log << "[Sniper] UnitName: " << unit_names[i] << ", UnitTemp: " << unit_temp[i];
 		if (i >= 40 && i < 72) {
 			temp_trace_log << ", Cntlr_" << i - 40 
 				<< " Power: " << vault_power[i-40] << ", Total Access: " << vault_access[i-40]; 
+=======
+		if (i < 25) {
+			if (max_temp < unit_temp[i]) {
+				max_temp = unit_temp[i];
+				s1 = unit_names[i];
+			}
+		} else if (i < 57) {
+			if (max_cntlr_temp < unit_temp[i]) {
+				max_cntlr_temp = unit_temp[i];
+				s2 = unit_names[i];
+			}
+		} else {
+			if (max_bank_temp < unit_temp[i]) {
+				max_bank_temp = unit_temp[i];
+				s3 = unit_names[i];
+			}
+		}
+		//temp_trace_log << "[Sniper] UnitName: " << unit_names[i] << ", UnitTemp: " << unit_temp[i];
+		if (i >= 25 && i < 57) {
+/*
+			temp_trace_log << ", Cntlr_" << i - 25 
+				<< " Power: " << vault_power[i-25] << ", Total Access: " << vault_access[i-25]; 
+*/
+>>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 		}
 		if (i >= 72) {
 			int v_i = (i - 72) % 32, b_i = (i - 72) / 32;
 			BankStatEntry *tmp = &bank_stats_interval[v_i][b_i];
 			/* Here we log temperature and access of banks*/
+<<<<<<< HEAD
 			temp_trace_log << ", Bank Power: " << bank_power[v_i][b_i] << ", Total Access: " << tmp->reads + tmp->writes;
 
+=======
+			//temp_trace_log << unit_names[i] << ", " << unit_temp[i] 
+			//	<< ", " << tmp->reads + tmp->writes; 
+>>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 			/* (REMAP_MAN) Here We Want to Update Temperature 
 			 * Here we set vault controller temperature
 			 * to any bank in the vault (because of temperature sensor)
@@ -854,7 +898,7 @@ StatsManager::callHotSpot()
 					cool_access[v_i][b_i] += tmp->reads + tmp->writes;
 			}
 		}
-		temp_trace_log << std::endl;
+		//temp_trace_log << std::endl;
 	}
 	int cache_reads = m_stacked_dram_unison->tot_reads,
 		cache_writes = m_stacked_dram_unison->tot_writes,
@@ -863,7 +907,15 @@ StatsManager::callHotSpot()
 	double cur_time_ms = double(m_current_time.getFS()) * 1.0e-12;
 	if (cache_misses != 0)
 		miss_rate = double(cache_misses) / double(cache_reads + cache_writes);
+<<<<<<< HEAD
 
+=======
+/*
+	temp_trace_log << "TotAccess: " << cache_reads + cache_writes 
+				   << " MissRate: " << miss_rate  
+				   << " CurrentTIme: " << cur_time_ms << std::endl;
+*/
+>>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 	m_stacked_dram_unison->clearCacheStats();
 }
 
@@ -903,10 +955,14 @@ timeDuration(std::chrono::steady_clock::time_point t1, std::chrono::steady_clock
 void
 StatsManager::recordStats(String prefix)
 {
+<<<<<<< HEAD
 	std::cout << "\n************recordStats once at " << m_current_time.getUS() << std::endl;
 
 	auto start = std::chrono::steady_clock::now();
 	std::cout << "[TIME_REC]Current Time in Chrono: " << timeDuration(start, last_time_point) << std::endl;
+=======
+	//std::cout << "recordStats once at " << m_current_time.getUS() << std::endl;
+>>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 
 	m_record_interval = m_current_time - m_last_record_time;
 	if (m_record_interval == SubsecondTime::Zero()) {

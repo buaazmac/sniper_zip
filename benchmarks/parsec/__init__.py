@@ -115,16 +115,13 @@ class Program:
       return 1
 
     flags = []
-    rundir = ""
+    rundir = tempfile.mkdtemp()
     cmd_arr = graphitecmd.split()
+    output_dir = ''
     for i in range(len(cmd_arr)):
       if cmd_arr[i] == '-d':
-        rundir = os.path.abspath(cmd_arr[i+1][1:-1])
-        print "set sniper output dir: ", rundir
+        output_dir = os.path.abspath(cmd_arr[i+1][1:-1])
         break
-    if not rundir:
-      rundir = tempfile.mkdtemp()
-      print "creating temp dir:", rundir
 
     if self.program == 'facesim':
       # Facesim needs a {rundir}/Storytelling/output directory and tries to create it with a system() call
@@ -147,7 +144,9 @@ class Program:
                      ] + flags)
     proc.communicate()
 
-    #os.system('rm -r %(rundir)s' % locals())
+    if output_dir != '':
+      os.system('mv ' + rundir + '/test_ttrace.txt ' + output_dir)
+    os.system('rm -r %(rundir)s' % locals())
     return proc.returncode
 
   def rungraphiteoptions(self):

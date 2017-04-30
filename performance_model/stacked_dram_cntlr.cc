@@ -501,7 +501,11 @@ StackedDramPerfUnison::clearCacheStats()
 	tot_reads = tot_writes = tot_misses = 0;
 
 	/* Enable Remapping for all bank*/
+<<<<<<< HEAD
 	//m_remap_manager->enableAllRemap();
+=======
+	m_remap_manager->enableAllRemap();
+>>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 	
 }
 

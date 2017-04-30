@@ -142,7 +142,11 @@ class StatsManager
 	  double bank_power[32][8];
 	  double vault_power[32];
 	  double power_L3;
+<<<<<<< HEAD
 	  double power_exe[4], power_ifetch[4], power_lsu[4], power_mmu[4], power_l2[4], power_ru[4], power_ialu[4], power_fpalu[4], power_inssch[4], power_l1i[4], power_insdec[4], power_bp[4], power_l1d[4];
+=======
+	  double power_exe[4], power_ifetch[4], power_lsu[4], power_mmu[4], power_l2[4], power_ru[4];
+>>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 	  int hot_access[32][8], cool_access[32][8], err_access[32][8];
 	  
 	  /*Temperature data*/
