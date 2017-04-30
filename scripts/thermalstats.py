@@ -30,6 +30,7 @@ class Power:
     return Power(self.s + v.s, self.d + v.d)
   def __sub__(self, v):
     return Power(self.s - v.s, self.d - v.d)
+zero_power = Power(0, 0)
 
 core_units = [('Execution Unit', 'exe'),
 			 ('Instruction Fetch Unit', 'ifetch'),
@@ -59,21 +60,26 @@ class ThermalStats:
       for core in range(sim.config.ncores):
 #print "-----register: ", metric, " ", core
         sim.stats.register('core', core, metric, self.get_stat)
-        sim.stats.register('L1-I', core, metric, self.get_stat)
-        sim.stats.register('L1-D', core, metric, self.get_stat)
-        sim.stats.register('L2', core, metric, self.get_stat)
+        sim.stats.register('ialu', core, metric, self.get_stat)
+        sim.stats.register('fpalu', core, metric, self.get_stat)
+        sim.stats.register('inssch', core, metric, self.get_stat)
+        sim.stats.register('l1i', core, metric, self.get_stat)
+        sim.stats.register('insdec', core, metric, self.get_stat)
+        sim.stats.register('btb', core, metric, self.get_stat)
+        sim.stats.register('bp', core, metric, self.get_stat)
+        sim.stats.register('ru', core, metric, self.get_stat)
+        sim.stats.register('l1d', core, metric, self.get_stat)
+        sim.stats.register('mmu', core, metric, self.get_stat)
+        sim.stats.register('l2', core, metric, self.get_stat)
+        sim.stats.register('lsu', core, metric, self.get_stat)
         sim.stats.register('exe', core, metric, self.get_stat)
         sim.stats.register('ifetch', core, metric, self.get_stat)
-        sim.stats.register('lsu', core, metric, self.get_stat)
-        sim.stats.register('mmu', core, metric, self.get_stat)
-        sim.stats.register('ru', core, metric, self.get_stat)
       #sim.stats.register_per_thread('core-'+metric, 'core', metric)
       #sim.stats.register_per_thread('L1-I-'+metric, 'L1-I', metric)
       #sim.stats.register_per_thread('L1-D-'+metric, 'L1-D', metric)
       #sim.stats.register_per_thread('L2-'+metric, 'L2', metric)
       sim.stats.register('processor', 0, metric, self.get_stat)
       sim.stats.register('dram', 0, metric, self.get_stat)
-      sim.stats.register('L3', 0, metric, self.get_stat)
 
   def periodic(self, time, time_delta):
     self.update()
@@ -123,20 +129,26 @@ class ThermalStats:
 
   def update_power(self, power):
     def get_power(component, prefix = ''):
-      return Power(component[prefix + 'Subthreshold Leakage'] + component[prefix + 'Gate Leakage'], component[prefix + 'Peak Dynamic'])
+      return Power(component[prefix + 'Subthreshold Leakage'] + component[prefix + 'Gate Leakage'], component[prefix + 'Runtime Dynamic'])
     for core in range(sim.config.ncores):
-      self.power[('L1-I', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/Instruction Cache/')
-      self.power[('L1-D', core)] = get_power(power['Core'][core], 'Load Store Unit/Data Cache/')
-      self.power[('L2',   core)] = get_power(power['Core'][core], 'L2/')
-      self.power[('core', core)] = get_power(power['Core'][core]) - (self.power[('L1-I', core)] + self.power[('L1-D', core)] + self.power[('L2', core)])
+      self.power[('l1i', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/Instruction Cache/')
+      self.power[('insdec', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/Instruction Decoder/')
+      self.power[('btb', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/Branch Target Buffer/')
+      self.power[('bp', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/Branch Predictor/')
+      self.power[('ru', core)] = get_power(power['Core'][core], 'Renaming Unit/')
+      self.power[('mmu', core)] = get_power(power['Core'][core], 'Memory Management Unit/')
+      self.power[('l1d', core)] = get_power(power['Core'][core], 'Load Store Unit/Data Cache/')
+      self.power[('l2',   core)] = get_power(power['Core'][core], 'L2/')
+      self.power[('core', core)] = get_power(power['Core'][core]) - (self.power[('l1i', core)] + self.power[('l1d', core)] + self.power[('l2', core)])
+      self.power[('ialu', core)] = get_power(power['Core'][core], 'Execution Unit/Integer ALUs/')
+      self.power[('fpalu', core)] = get_power(power['Core'][core], 'Execution Unit/Floating Point Units/')
+      self.power[('inssch', core)] = get_power(power['Core'][core], 'Execution Unit/Instruction Scheduler/')
+      self.power[('lsu', core)] = get_power(power['Core'][core], 'Load Store Unit/')
       self.power[('exe', core)] = get_power(power['Core'][core], 'Execution Unit/')
       self.power[('ifetch', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/')
-      self.power[('lsu', core)] = get_power(power['Core'][core], 'Load Store Unit/')
-      self.power[('mmu', core)] = get_power(power['Core'][core], 'Memory Management Unit/')
-      self.power[('ru', core)] = get_power(power['Core'][core], 'Renaming Unit/')
     self.power[('processor', 0)] = get_power(power['Processor'])
     self.power[('dram', 0)] = get_power(power['DRAM'])
-    self.power[('L3', 0)] = get_power(power['L3'][0])
+#self.power[('L3', 0)] = get_power(power['L3'][0])
 
   def update_energy(self):
     if self.power and sim.stats.time() > self.time_last_energy:

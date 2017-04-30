@@ -118,6 +118,9 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 	/*DEBUG*/
 	log_file.open ("unison_log.txt");
 
+	//bool remap_config = Sim()->getCfg()->getBoolDefault("perf_model/dram_cache/remap", false);
+	//std::cout << "Configuration: " << Sim()->getCfg()->getInt("perf_model/dram_cache/interval") << std::endl;
+
 	n_banks = m_vault_size / m_bank_size;
 
 	n_rows = m_bank_size / m_row_size;
@@ -129,7 +132,19 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 
 	//m_vremap_table = new VaultRemappingStructure(vaults_num);
 	/* (REMAP_MAN) Remapping Managere, policy defined here*/
-	m_remap_manager = new RemappingManager(this, 1);
+	m_remap_manager = new RemappingManager(this);
+
+	/*
+	Here we set the configuration for experiments using config file
+	 */
+	UInt32 c_max_remap_num = Sim()->getCfg()->getInt("perf_model/remap_config/max_remap_time");
+	UInt32 c_row_access_threshold = Sim()->getCfg()->getInt("perf_model/remap_config/row_access_threshold");
+	bool c_cross = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/cross", true);
+	bool c_invalid = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/invalidation", true);
+	bool c_mig = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/migration", false);
+	m_remap_manager->setRemapConfig(c_max_remap_num, c_row_access_threshold, c_cross, c_invalid, c_mig);
+
+
 	remapped = false;
 	enter_roi = false;
 
@@ -166,9 +181,24 @@ StackedDramPerfUnison::splitSetNum(UInt32 set_i, UInt32* vault_i, UInt32* bank_i
 	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
 	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
 
-	*vault_i = (set_i >> row_bit) & ((1UL << vault_bit) - 1);
-	*bank_i = set_i >> row_bit >> vault_bit; 
-	*row_i = set_i & ((1UL << row_bit) - 1);
+	int set_addr_map =  Sim()->getCfg()->getInt("perf_model/dram_cache/addr_map");
+
+	if (set_addr_map == 1) { // v_b_r
+		*vault_i = set_i >> row_bit >> bank_bit;
+		*bank_i = (set_i >> row_bit) & ((1UL << bank_bit) - 1); 
+		*row_i = set_i & ((1UL << row_bit) - 1);
+	} else if (set_addr_map == 2) { // b_v_r
+		*vault_i = (set_i >> row_bit) & ((1UL << vault_bit) - 1);
+		*bank_i = set_i >> row_bit >> vault_bit; 
+		*row_i = set_i & ((1UL << row_bit) - 1);
+	} else if (set_addr_map == 3) { // r_b_v
+		*vault_i = set_i & ((1UL << vault_bit) - 1);
+		*bank_i = (set_i >> vault_bit) & ((1UL << bank_bit) - 1); 
+		*row_i = set_i >> vault_bit >> bank_bit;
+	} else {
+		std::cout << "[Config Error] No such set address mapping configuration!\n";
+	}
+
 }
 UInt32 
 StackedDramPerfUnison::getSetNum(UInt32 vault_i, UInt32 bank_i, UInt32 row_i)
@@ -177,9 +207,25 @@ StackedDramPerfUnison::getSetNum(UInt32 vault_i, UInt32 bank_i, UInt32 row_i)
 	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
 	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
 
-	UInt32 set_i = bank_i << vault_bit << row_bit;
-	set_i |= (vault_i << row_bit);
-	set_i |= (row_i);
+	int set_addr_map =  Sim()->getCfg()->getInt("perf_model/dram_cache/addr_map");
+	UInt32 set_i = 0;
+
+	if (set_addr_map == 1) { // v_b_r
+		set_i = vault_i << bank_bit << row_bit;
+		set_i |= (bank_i << row_bit);
+		set_i |= row_i;
+	} else if (set_addr_map == 2) { // b_v_r
+		set_i = bank_i << vault_bit << row_bit;
+		set_i |= (vault_i << row_bit);
+		set_i |= row_i;
+	} else if (set_addr_map == 3) { // r_b_v
+		set_i = row_i << vault_bit << bank_bit;
+		set_i |= (bank_i << vault_bit);
+		set_i |= vault_i;
+	} else {
+		std::cout << "[Config Error] No such set address mapping configuration!\n";
+	}
+
 	return set_i;
 }
 
@@ -256,7 +302,7 @@ StackedDramPerfUnison::getAccessLatency(
 		clk_elasped = 0;
 	}
 	if (clk_elasped > 1e6) {
-		std::cout << "[Ramulator] Too many ticks required!\n";
+		//std::cout << "[Ramulator] Too many ticks required!\n";
 		clk_elasped = 1e6;
 	}
 	if (first_req) {
@@ -276,7 +322,8 @@ StackedDramPerfUnison::getAccessLatency(
 TODO: Here we need to handle memory request with physical index
 	   */
 	/* (REMAP_MAN) Here we update statistics store unit*/
-	m_remap_manager->accessRow(remapVault, remapBank, remapRow, req_times);
+	if (access_type != DramCntlrInterface::TRANS)
+		m_remap_manager->accessRow(remapVault, remapBank, remapRow, req_times);
 
 	/* STAT_DEBUG */
 	if (access_type == DramCntlrInterface::READ) {
@@ -303,7 +350,7 @@ TODO: Here we need to handle memory request with physical index
 				m_dram_model->tickOnce();
 				clks++;
 			}
-		} else {
+		} else if (access_type == DramCntlrInterface::WRITE) {
 			stall = !m_dram_model->writeRow(remapVault, remapBank, remapRow, 0);
 			m_dram_model->tickOnce();
 			clks++;
@@ -316,6 +363,11 @@ TODO: Here we need to handle memory request with physical index
 				m_dram_model->tickOnce();
 				clks++;
 			}
+		} else {
+			// Transfer is a 2-clocks command
+			clks += 2;
+			m_dram_model->tickOnce();
+			m_dram_model->tickOnce();
 		}
 		clks += m_dram_model->getReadLatency(remapVault);
 
@@ -336,8 +388,6 @@ StackedDramPerfUnison::checkTemperature(UInt32 vault_i, UInt32 bank_i)
 void
 StackedDramPerfUnison::tryRemapping()
 {
-	if (!enter_roi) return;
-
 	UInt32 remap_times = m_remap_manager->tryRemapping(true);
 	remapped = true;
 }
@@ -389,6 +439,7 @@ StackedDramPerfUnison::clearRemappingStat()
 	m_remap_manager->finishRemapping();
 	/* reset Remapping after each remap interval */
 	m_remap_manager->resetStats();
+	m_remap_manager->enableAllRemap();
 }
 
 void
@@ -432,6 +483,10 @@ StackedDramPerfUnison::updateStats()
 			bank->stats.reads = m_dram_model->getBankReads(i, j);
 			bank->stats.writes = m_dram_model->getBankWrites(i, j);
 
+			bank->stats.row_hits = m_dram_model->getBankRowHits(i, j);
+			bank->stats.row_conflicts = m_dram_model->getBankRowConflicts(i, j);
+			bank->stats.row_misses = m_dram_model->getBankRowMisses(i, j);
+
 			tot_act_t += bank->stats.tACT;
 			tot_pre_t += bank->stats.tPRE;
 			tot_rd_t += bank->stats.tRD;
@@ -444,17 +499,25 @@ void
 StackedDramPerfUnison::clearCacheStats()
 {
 	tot_reads = tot_writes = tot_misses = 0;
+
+	/* Enable Remapping for all bank*/
+	//m_remap_manager->enableAllRemap();
+	
 }
 
 void
 StackedDramPerfUnison::updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp)
 {
+
 	m_remap_manager->updateTemperature(v, b, temperature, v_temp);
 	if (temperature >= 85) {
+		m_vaults_array[v]->m_banks_array[b]->stats.hot = true;
 		enter_roi = true;
 		m_dram_model->setBankRef(v, b, true);
+		
 		//std::cout << " Set Higher Ref Freq in bank " << v << " " << b << std::endl;
 	} else {
+		m_vaults_array[v]->m_banks_array[b]->stats.hot = false;
 		m_dram_model->setBankRef(v, b, false);
 	}
 }

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "time.h"
+#include <chrono>
+
 #include "simulator.h"
 #include "itostr.h"
 
@@ -120,10 +123,14 @@ class StatsManager
 	  std::ofstream dram_stats_file;
 	  /*Record the previous statistics*/
 	  SubsecondTime RemapInterval;
+	  bool do_remap;
+
 	  SubsecondTime m_current_time;
 	  SubsecondTime m_last_remap_time;
 	  SubsecondTime m_last_record_time;
 	  SubsecondTime m_record_interval;
+
+	  std::chrono::steady_clock::time_point last_time_point;
 
 	  bool first_ttrace;
 
@@ -135,8 +142,8 @@ class StatsManager
 	  double bank_power[32][8];
 	  double vault_power[32];
 	  double power_L3;
-	  double power_exe[4], power_ifetch[4], power_lsu[4], power_mmu[4], power_l2[4], power_ru[4];
-	  int hot_access[32][8], cool_access[32][8];
+	  double power_exe[4], power_ifetch[4], power_lsu[4], power_mmu[4], power_l2[4], power_ru[4], power_ialu[4], power_fpalu[4], power_inssch[4], power_l1i[4], power_insdec[4], power_bp[4], power_l1d[4];
+	  int hot_access[32][8], cool_access[32][8], err_access[32][8];
 	  
 	  /*Temperature data*/
 	  int unit_num;
@@ -155,22 +162,24 @@ class StatsManager
 	  Hotspot *hotspot;
 	  /*Calculate DRAM power*/
 	  struct DramTable {
-		  double maxVcc; //1.26V
-		  double Vdd;	//1.2V
-		  double Idd2P;  //34mA
-		  double Idd2N;  //50mA
-		  double Idd3P;  //40mA
-		  double Idd3N;  //65mA
-		  double Idd5;   //175mA
-		  double Idd4W;  //195mA
-		  double Idd0;   //65mA
-		  double RFC_min;//260ns
+		  double freq; //500 MHz
+		  double maxVcc; //1.575V
+		  double Vdd;	//1.5V
+		  double Idd2P;  //20mA
+		  double Idd2N;  //40mA
+		  double Idd3P;  //45mA
+		  double Idd3N;  //42mA
+		  double Idd5;   //200mA
+		  double Idd4W;  //160mA
+		  double Idd4R;  //200mA
+		  double Idd0;   //70mA
+		  double RFC_min;//340ns
 		  double REFI;   //7800ns
-		  double tRAS;   //32ns
-		  double tRC;    //45.5ns
-		  double tCKavg; //0.75ns
-		  int burstLen; //8
-	  } dram_table = {1.26, 1.2, 34, 50, 40, 65, 175, 195, 65, 260, 7800, 32, 45.5, 0.75, 8};
+		  double tRAS;   //37.5ns
+		  double tRC;    //52.5ns
+		  double tCKavg; //2.5ns
+		  double burstLen; //8
+	  } dram_table = {500, 1.575, 1.5, 20, 40, 45, 42, 200, 160, 200, 70, 340, 7800, 37.5, 52.5, 2.5, 8};
 	  struct DramCntlrTable {
 		  double DRAM_CLK;
 		  double DRAM_POWER_READ;
@@ -178,7 +187,9 @@ class StatsManager
 		  double num_dram_controllers;
 		  double chips_per_dimm;
 		  double dimms_per_socket;
-	  } dram_cntlr_table = {800.0, 0.678, 0.825, 1.0, 8.0, 4.0};
+	  } dram_cntlr_table = {500.0, 0.678, 0.825, 1.0, 8.0, 4.0};
+
+	  double computeBankPower(double bnk_pre, double cke_lo_pre, double page_hit, double WRsch, double RDsch, bool hot, double Vdd_use);
 
 	  double computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, SubsecondTime tRD, SubsecondTime tWR, SubsecondTime totT, UInt32 reads, UInt32 writes, double page_hit_rate);
 	  double computeDramCntlrPower(UInt32 reads, UInt32 writes, SubsecondTime t);

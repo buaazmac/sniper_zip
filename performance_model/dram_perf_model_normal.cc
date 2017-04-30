@@ -179,6 +179,23 @@ DramCacheSetUnison::invalidateContent()
 }
 
 UInt32
+DramCacheSetUnison::getDirtyBlocks()
+{
+	UInt32 dirty_blocks = 0;
+	for (UInt32 i = 0; i < m_associativity; i++) {
+		UInt32 db = m_cache_page_info_array[i]->getDirtyBits();
+		while (db > 0) {
+			if ((db & 1) == 1) {
+				dirty_blocks ++;
+			}
+			db >>= 1;
+		}
+	}
+	//std::cout << "after get valid blocks" << std::endl;
+	return dirty_blocks;
+}
+
+UInt32
 DramCacheSetUnison::getValidBlocks()
 {
 	//std::cout << "before get valid blocks" << std::endl;
@@ -564,41 +581,43 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 	for (UInt32 vault_i = 0; vault_i < vault_num; vault_i++) {
 		for (UInt32 bank_i = 0; bank_i < bank_num; bank_i++) {
 			for (UInt32 row_i = 0; row_i < row_num; row_i++) {
-				UInt32 row_valid_blocks = 0, row_wb_blocks = 0;
 				bool valid = m_dram_perf_model->checkRowValid(vault_i, bank_i, row_i),
 					 migrated = m_dram_perf_model->checkRowMigrated(vault_i, bank_i, row_i);
 				if (valid && !migrated) continue;
 
 				UInt32 set_valid_blocks = 0, set_wb_blocks = 0;
 				UInt32 set_i = m_dram_perf_model->getSetNum(vault_i, bank_i, row_i);
-				if (!valid) {
-					set_wb_blocks = m_set[set_i]->invalidateContent();
-					row_wb_blocks += set_wb_blocks;
 
+				set_wb_blocks = m_set[set_i]->getDirtyBlocks();
+				set_valid_blocks = m_set[set_i]->getValidBlocks();
+
+				if (!valid) {
+					/* Latency for invalidation */
+					dram_delay += m_dram_bandwidth.getRoundedLatency(64 * set_wb_blocks);
+					dram_delay += handleDramAccess(pkt_time, set_wb_blocks * 64, set_i, DramCntlrInterface::READ, perf); 
+					m_set[set_i]->invalidateContent();
 					invalid_times ++;
 					invalid_blocks += set_wb_blocks;
-				} else {
-					set_valid_blocks = m_set[set_i]->getValidBlocks();
-					row_valid_blocks += set_valid_blocks;
-
+				} else if (migrated) {
+					/* Latency for migration */
+					dram_delay += handleDramAccess(pkt_time, 64, set_i, DramCntlrInterface::READ, perf); 
+					dram_delay += handleDramAccess(pkt_time, 64, set_i, DramCntlrInterface::WRITE, perf); 
+					dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::TRANS, perf); 
+					dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::TRANS, perf); 
 					migrate_times ++;
 					migrate_blocks += set_valid_blocks;
 				}
-				/* Latency for migration */
-				dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::READ, perf); 
-				dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE, perf); 
-				/* Latency for invalidation */
-				dram_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * set_wb_blocks);
+			
 
 				/*
 				std::cout << "[REMAP_DEBUG] Amazing, we found an invalid row!\n"
 					      << "------wb_blocks: " << set_wb_blocks
 						  << "------valid blocks: " << set_valid_blocks
 						  << std::endl;
-						  */
+				*/
 				
-				valid_blocks += row_valid_blocks;
-				writeback_blocks += row_wb_blocks;
+				valid_blocks += set_valid_blocks;
+				writeback_blocks += set_wb_blocks;
 			}
 		}
 	}
@@ -612,6 +631,8 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 
 SubsecondTime
 StackDramCacheCntlrUnison::handleDramAccess(SubsecondTime pkt_time, UInt32 pkt_size, UInt32 set_n, DramCntlrInterface::access_t access_type, ShmemPerf *perf) {
+	if (pkt_time.getNS() % 100000  == 0)
+		std::cout << "Here is a mem req at " << pkt_time.getNS() << std::endl; 
 	UInt32 bandwidth = 128;
 	int req_times = pkt_size / bandwidth;
 	if (req_times < 1) {
@@ -628,12 +649,13 @@ StackDramCacheCntlrUnison::handleDramAccess(SubsecondTime pkt_time, UInt32 pkt_s
 
 	SubsecondTime delay = SubsecondTime::Zero();
 	while (req_times--) {
-		delay += m_dram_perf_model->getAccessLatency(pkt_time, 128, set_n, access_type); 
+		delay += m_dram_perf_model->getAccessLatency(pkt_time + delay, 128, set_n, access_type); 
 
 		Sim()->getStatsManager()->updateCurrentTime(pkt_time + delay);
 		perf->updateTime(pkt_time, ShmemPerf::DRAM_QUEUE);
 		perf->updateTime(pkt_time + delay);
 	}
+	//delay += SubsecondTime::US(10);
 	return delay;
 }
 
@@ -649,8 +671,8 @@ StackDramCacheCntlrUnison::translateAddress(IntPtr address)
 	} else {
 		page_table[v_tag] = avail_phy_page_tag;
 		p_tag = avail_phy_page_tag;
+		avail_phy_page_tag ++;
 	}
-	avail_phy_page_tag ++;
 	return ((p_tag << 12) | offset);
 }
 
@@ -662,6 +684,7 @@ StackDramCacheCntlrUnison::SplitAddress(IntPtr v_address, UInt32 *set_n, IntPtr 
 	UInt64 addr = address / m_pagesize;
 	*set_n = addr & ((1UL << floorLog2(m_set_num)) - 1);
 	*page_tag = addr >> floorLog2(m_set_num);
+	//log_file << v_address << ' ' << address << ' ' << *set_n << std::endl;
 	return true;
 }
 
