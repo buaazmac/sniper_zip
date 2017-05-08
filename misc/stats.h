@@ -4,6 +4,7 @@
 #include <chrono>
 
 #include "simulator.h"
+#include "dvfs_manager.h"
 #include "itostr.h"
 
 #include "../performance_model/stacked_dram_cntlr.h"
@@ -142,11 +143,7 @@ class StatsManager
 	  double bank_power[32][8];
 	  double vault_power[32];
 	  double power_L3;
-<<<<<<< HEAD
 	  double power_exe[4], power_ifetch[4], power_lsu[4], power_mmu[4], power_l2[4], power_ru[4], power_ialu[4], power_fpalu[4], power_inssch[4], power_l1i[4], power_insdec[4], power_bp[4], power_l1d[4];
-=======
-	  double power_exe[4], power_ifetch[4], power_lsu[4], power_mmu[4], power_l2[4], power_ru[4];
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 	  int hot_access[32][8], cool_access[32][8], err_access[32][8];
 	  
 	  /*Temperature data*/
@@ -192,6 +189,9 @@ class StatsManager
 		  double chips_per_dimm;
 		  double dimms_per_socket;
 	  } dram_cntlr_table = {500.0, 0.678, 0.825, 1.0, 8.0, 4.0};
+
+	  void setGlobalFrequency(UInt64 freq_in_mhz);
+	  void setFrequency(UInt64 core_num, UInt64 freq_in_mhz);
 
 	  double computeBankPower(double bnk_pre, double cke_lo_pre, double page_hit, double WRsch, double RDsch, bool hot, double Vdd_use);
 

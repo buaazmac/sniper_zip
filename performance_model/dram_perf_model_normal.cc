@@ -591,22 +591,14 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 				set_wb_blocks = m_set[set_i]->getDirtyBlocks();
 				set_valid_blocks = m_set[set_i]->getValidBlocks();
 
-<<<<<<< HEAD
 				if (!valid) {
-=======
-				if (set_wb_blocks < 10 && set_wb_blocks < set_valid_blocks) {
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 					/* Latency for invalidation */
 					dram_delay += m_dram_bandwidth.getRoundedLatency(64 * set_wb_blocks);
 					dram_delay += handleDramAccess(pkt_time, set_wb_blocks * 64, set_i, DramCntlrInterface::READ, perf); 
 					m_set[set_i]->invalidateContent();
 					invalid_times ++;
 					invalid_blocks += set_wb_blocks;
-<<<<<<< HEAD
 				} else if (migrated) {
-=======
-				} else {
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 					/* Latency for migration */
 					dram_delay += handleDramAccess(pkt_time, 64, set_i, DramCntlrInterface::READ, perf); 
 					dram_delay += handleDramAccess(pkt_time, 64, set_i, DramCntlrInterface::WRITE, perf); 
@@ -617,14 +609,12 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 				}
 			
 
+				/*
 				std::cout << "[REMAP_DEBUG] Amazing, we found an invalid row!\n"
 					      << "------wb_blocks: " << set_wb_blocks
 						  << "------valid blocks: " << set_valid_blocks
 						  << std::endl;
-<<<<<<< HEAD
 				*/
-=======
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 				
 				valid_blocks += set_valid_blocks;
 				writeback_blocks += set_wb_blocks;
@@ -648,14 +638,6 @@ StackDramCacheCntlrUnison::handleDramAccess(SubsecondTime pkt_time, UInt32 pkt_s
 	if (req_times < 1) {
 		req_times = 1;
 	}
-	if (pkt_size == 0)
-		req_times = 0;
-
-	/*
-	std::cout << "[Handle Dram Access] " 
-			  << "pkt_time: " << pkt_time
-			  << ", pkt_size: " << pkt_size << std::endl;
-			  */
 
 	SubsecondTime delay = SubsecondTime::Zero();
 	while (req_times--) {
@@ -666,6 +648,12 @@ StackDramCacheCntlrUnison::handleDramAccess(SubsecondTime pkt_time, UInt32 pkt_s
 		perf->updateTime(pkt_time + delay);
 	}
 	//delay += SubsecondTime::US(10);
+	/*
+	std::cout << "[Handle Dram Access] " 
+			  << "pkt_time: " << pkt_time
+			  << ", pkt_size: " << pkt_size 
+			  << ", delay: " << delay.getNS() << std::endl;
+			  */
 	return delay;
 }
 

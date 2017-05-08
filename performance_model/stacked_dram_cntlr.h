@@ -19,6 +19,9 @@
 #include "ramulator/dram_sim.h"
 #include "remapping.h"
 
+#include "config.hpp"
+#include "simulator.h"
+
 //class VaultRemappingStructure;
 //class BankRemappingStructure;
 
@@ -58,7 +61,7 @@ class StackedDramPerfUnison {
 
 		/* Remapping Manager (REMAP_MAN)*/
 		RemappingManager* m_remap_manager;
-		bool remapped, enter_roi;
+		bool enable_remap, remapped, enter_roi;
 		UInt32 v_remap_times, b_remap_times;
 
 		/* Some DRAM statistics*/

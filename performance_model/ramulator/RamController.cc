@@ -273,24 +273,30 @@ namespace ramulator
                 if (is_row_hit(req)) {
                     ++read_row_hits[coreid];
                     ++row_hits;
+					++bank_read_row_hits[bank_i];
                 } else if (is_row_open(req)) {
                     ++read_row_conflicts[coreid];
                     ++row_conflicts;
+					++bank_read_row_conflicts[bank_i];
                 } else {
                     ++read_row_misses[coreid];
                     ++row_misses;
+					++bank_read_row_misses[bank_i];
                 }
               read_transaction_bytes += tx;
             } else if (req->type == RamRequest::Type::WRITE) {
 				if (is_row_hit(req)) {
 					++write_row_hits[coreid];
 					++row_hits;
+					++bank_write_row_hits[bank_i];
 				} else if (is_row_open(req)) {
 					++write_row_conflicts[coreid];
 					++row_conflicts;
+					++bank_write_row_conflicts[bank_i];
 				} else {
 					++write_row_misses[coreid];
 					++row_misses;
+					++bank_write_row_misses[bank_i];
 				}
 				write_transaction_bytes += tx;
 			}

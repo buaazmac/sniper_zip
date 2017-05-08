@@ -142,6 +142,7 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 	bool c_cross = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/cross", true);
 	bool c_invalid = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/invalidation", true);
 	bool c_mig = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/migration", false);
+	enable_remap = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/remap", false);
 	m_remap_manager->setRemapConfig(c_max_remap_num, c_row_access_threshold, c_cross, c_invalid, c_mig);
 
 
@@ -369,7 +370,8 @@ TODO: Here we need to handle memory request with physical index
 			m_dram_model->tickOnce();
 			m_dram_model->tickOnce();
 		}
-		clks += m_dram_model->getReadLatency(remapVault);
+		//clks += m_dram_model->getReadLatency(remapVault);
+		clks += m_dram_model->getPrevLatency();
 
 		UInt64 latency_ns = UInt64(m_dram_model->tCK) * clks;
 		process_latency += SubsecondTime::NS(latency_ns);
@@ -388,7 +390,7 @@ StackedDramPerfUnison::checkTemperature(UInt32 vault_i, UInt32 bank_i)
 void
 StackedDramPerfUnison::tryRemapping()
 {
-	UInt32 remap_times = m_remap_manager->tryRemapping(true);
+	UInt32 remap_times = m_remap_manager->tryRemapping(enable_remap);
 	remapped = true;
 }
 
@@ -460,14 +462,28 @@ StackedDramPerfUnison::updateStats()
 	*/
 	//m_remap_manager->resetRemapping();
 
+	log_file << " Updating Statistics for Vaults/Banks" << std::endl;
+
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		VaultPerfModel* vault = m_vaults_array[i];
-		vault->stats.reads = m_dram_model->getVaultRdReq(i);
-		vault->stats.writes = m_dram_model->getVaultWrReq(i);
+	//	vault->stats.reads = m_dram_model->getVaultRdReq(i);
+		vault->stats.reads = m_dram_model->getServingRdReq(i);
+	//	vault->stats.writes = m_dram_model->getVaultWrReq(i);
+		vault->stats.writes = m_dram_model->getServingWrReq(i);
 		vault->stats.row_hits = m_dram_model->getVaultRowHits(i);
+		vault->stats.que_len = m_dram_model->getVaultQueLenSum(i);
+		
 
 		UInt32 serv_rd = m_dram_model->getServingRdReq(i);
 		UInt32 serv_wr = m_dram_model->getServingWrReq(i);
+
+		log_file << "Vault_" << i << ": "
+				 << vault->stats.reads << " "
+				 << vault->stats.writes << " "
+				 << vault->stats.row_hits << " "
+				 << vault->stats.que_len << " "
+				 << serv_rd << " "
+				 << serv_wr << std::endl;
 
 		tot_dram_reads += vault->stats.reads;
 		tot_dram_writes += vault->stats.writes;
@@ -501,11 +517,7 @@ StackedDramPerfUnison::clearCacheStats()
 	tot_reads = tot_writes = tot_misses = 0;
 
 	/* Enable Remapping for all bank*/
-<<<<<<< HEAD
 	//m_remap_manager->enableAllRemap();
-=======
-	m_remap_manager->enableAllRemap();
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 	
 }
 

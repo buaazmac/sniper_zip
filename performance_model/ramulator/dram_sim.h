@@ -52,8 +52,12 @@ public:
 	/* The unit of all time stats is "NS" */
 
 	int getReadLatency(int vault);
+	int getPrevLatency();
 
 	uint64_t getTotTime();
+
+	double getVaultQueLenAvg(int vault);
+	double getVaultQueLenSum(int vault);
 
 	uint64_t getVaultRdReq(int vault);
 	
@@ -63,6 +67,10 @@ public:
 	uint64_t getServingWrReq(int vault);
 
 	uint64_t getVaultRowHits(int vault);
+
+	uint64_t getBankRowHits(int vault, int bank);
+	uint64_t getBankRowConflicts(int vault, int bank);
+	uint64_t getBankRowMisses(int vault, int bank);
 
 	uint64_t getBankActTime(int vault, int bank);
 

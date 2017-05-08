@@ -156,7 +156,6 @@ public:
             .precision(0)
             ;
 		
-		cout << "sz[int(channel)]: " << sz[int(Level::Channel)] << endl;
         incoming_requests_per_channel
             .init(sz[int(Level::Channel)])
             .name("incoming_requests_per_channel")

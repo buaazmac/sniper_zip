@@ -202,14 +202,10 @@ StatsManager::init()
    last_time_point = std::chrono::steady_clock::now();
 
    /* Initialize remap interval*/
-<<<<<<< HEAD
 	// EXP_SET
    int remap_interval_us = Sim()->getCfg()->getInt("perf_model/remap_config/remap_interval");
    RemapInterval = SubsecondTime::US(remap_interval_us);
    do_remap = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/remap", false);
-=======
-   RemapInterval = SubsecondTime::US(10);
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 
    first_ttrace = false;
 
@@ -240,6 +236,29 @@ StatsManager::recordMetricName(UInt64 keyId, std::string objectName, std::string
    sqlite3_bind_text(m_stmt_insert_name, 3, metricName.c_str(), -1, SQLITE_TRANSIENT);
    res = sqlite3_step(m_stmt_insert_name);
    LOG_ASSERT_ERROR(res == SQLITE_DONE, "Error executing SQL statement");
+}
+
+void
+StatsManager::setGlobalFrequency(UInt64 freq_in_mhz)
+{
+	UInt32 num_cores = Sim()->getConfig()->getApplicationCores();
+	for (UInt32 c_i = 0; c_i < num_cores; c_i++) {
+		setFrequency(c_i, freq_in_mhz);
+	}
+}
+
+void
+StatsManager::setFrequency(UInt64 core_num, UInt64 freq_in_mhz)
+{
+	std::cout << "[SNIPER_STATS_MANAGER] Setting frequency for core " << core_num
+			  << " in DVFS domain " << Sim()->getDvfsManager()->getCoreDomainId(core_num)
+			  << " to " << freq_in_mhz << " MHz" << std::endl;
+	UInt64 freq_in_hz = freq_in_mhz * 1000000;
+	if (freq_in_hz > 0) {
+		Sim()->getDvfsManager()->setCoreDomain(core_num, ComponentPeriod::fromFreqHz(freq_in_hz));
+	} else {
+		std::cout << "[SNIPER_STATS_MANAGER] Fail to set frequency" << std::endl;
+	}
 }
 
 double
@@ -541,14 +560,7 @@ StatsManager::dumpHotspotInput()
 	pt_file << std::endl;
 	/* We first write down the last power trace*/
 	for (int pt = 0; pt < 1; pt ++) {
-		//pt_file << power_L3;
-
 		for (int i = 0; i < 4; i++) {
-			/*
-			pt_file << "\t" << power_exe[i] << "\t" << power_ifetch[i] 
-					<< "\t" << power_lsu[i] << "\t" << power_mmu[i]
-					<< "\t" << power_l2[i] << "\t" << power_ru[i];
-					*/
 			pt_file << power_ialu[i] << "\t" << power_fpalu[i] 
 					<< "\t" << power_inssch[i] << "\t" << power_l1i[i]
 					<< "\t" << power_insdec[i] << "\t" << power_bp[i]
@@ -566,28 +578,23 @@ StatsManager::dumpHotspotInput()
 		pt_file << std::endl;
 
 		/* Here we output power trace for drawing picture*/
-<<<<<<< HEAD
-=======
-/*
-		power_trace_log << power_L3;
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 		for (int i = 0; i < 4; i++) {
 			power_trace_log << power_ialu[i] << "\t" << power_fpalu[i] 
 					<< "\t" << power_inssch[i] << "\t" << power_l1i[i]
 					<< "\t" << power_insdec[i] << "\t" << power_bp[i]
 					<< "\t" << power_ru[i] << "\t" << power_l1d[i]
-					<< "\t" << power_mmu[i] << "\t" << power_l2[i] << "\t";
+					<< "\t" << power_mmu[i] << "\t" << power_l2[i] << " | \t";
 		}
 		for (int i = 0; i < 32; i++) {
 			power_trace_log << vault_power[i] << "\t";
 		}
+		power_trace_log << " | ";
 		for (int j = 0; j < 8; j++) {
 			for (int i =0; i < 32; i++) {
 				power_trace_log << bank_power[i][j] << "\t";
 			}
 		}
 		power_trace_log << std::endl;
-*/
 		/**/
 	}
 //for (int pt_it = 0; pt_it < 2; pt_it++) {
@@ -831,56 +838,26 @@ StatsManager::callHotSpot()
 	max_temp = max_cntlr_temp = max_bank_temp = 0;
 	char *s1, *s2, *s3;
 
-<<<<<<< HEAD
-	temp_trace_log << "-------trace_" << ttrace_num << "-----" << std::endl;
-=======
-	//temp_trace_log << "-------trace_" << ttrace_num << "-----" << std::endl;
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
+	temp_trace_log << "-------trace_" << ttrace_num << "-----"  
+				   << "current_interval: " << m_record_interval.getUS() << std::endl;
 
 	ttrace_num ++;
 
 	for (int i = 0; i < unit_num; i++) {
-<<<<<<< HEAD
 		temp_trace_log << "[Sniper] UnitName: " << unit_names[i] << ", UnitTemp: " << unit_temp[i];
+		if (unit_temp[i] > max_temp) max_temp = unit_temp[i];
 		if (i >= 40 && i < 72) {
 			temp_trace_log << ", Cntlr_" << i - 40 
 				<< " Power: " << vault_power[i-40] << ", Total Access: " << vault_access[i-40]; 
-=======
-		if (i < 25) {
-			if (max_temp < unit_temp[i]) {
-				max_temp = unit_temp[i];
-				s1 = unit_names[i];
-			}
-		} else if (i < 57) {
-			if (max_cntlr_temp < unit_temp[i]) {
-				max_cntlr_temp = unit_temp[i];
-				s2 = unit_names[i];
-			}
-		} else {
-			if (max_bank_temp < unit_temp[i]) {
-				max_bank_temp = unit_temp[i];
-				s3 = unit_names[i];
-			}
-		}
-		//temp_trace_log << "[Sniper] UnitName: " << unit_names[i] << ", UnitTemp: " << unit_temp[i];
-		if (i >= 25 && i < 57) {
-/*
-			temp_trace_log << ", Cntlr_" << i - 25 
-				<< " Power: " << vault_power[i-25] << ", Total Access: " << vault_access[i-25]; 
-*/
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
+			if (unit_temp[i] > max_cntlr_temp) max_cntlr_temp = unit_temp[i];
 		}
 		if (i >= 72) {
 			int v_i = (i - 72) % 32, b_i = (i - 72) / 32;
 			BankStatEntry *tmp = &bank_stats_interval[v_i][b_i];
 			/* Here we log temperature and access of banks*/
-<<<<<<< HEAD
 			temp_trace_log << ", Bank Power: " << bank_power[v_i][b_i] << ", Total Access: " << tmp->reads + tmp->writes;
+			if (unit_temp[i] > max_bank_temp) max_bank_temp = unit_temp[i];
 
-=======
-			//temp_trace_log << unit_names[i] << ", " << unit_temp[i] 
-			//	<< ", " << tmp->reads + tmp->writes; 
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 			/* (REMAP_MAN) Here We Want to Update Temperature 
 			 * Here we set vault controller temperature
 			 * to any bank in the vault (because of temperature sensor)
@@ -898,8 +875,20 @@ StatsManager::callHotSpot()
 					cool_access[v_i][b_i] += tmp->reads + tmp->writes;
 			}
 		}
-		//temp_trace_log << std::endl;
+		temp_trace_log << std::endl;
 	}
+
+	/* Here we choose what to do with DVFS */
+	double cpu_temp_thres = Sim()->getCfg()->getInt("perf_model/thermal/cpu_temp_thres"), 
+		   dram_temp_thres = Sim()->getCfg()->getInt("perf_model/thermal/dram_temp_thres");
+	if (max_temp > cpu_temp_thres) {
+		setGlobalFrequency(1000);
+		//setGlobalFrequency(2660);
+	} else {
+		setGlobalFrequency(2660);
+		//setGlobalFrequency(1000);
+	}
+
 	int cache_reads = m_stacked_dram_unison->tot_reads,
 		cache_writes = m_stacked_dram_unison->tot_writes,
 	    cache_misses = m_stacked_dram_unison->tot_misses;
@@ -907,15 +896,7 @@ StatsManager::callHotSpot()
 	double cur_time_ms = double(m_current_time.getFS()) * 1.0e-12;
 	if (cache_misses != 0)
 		miss_rate = double(cache_misses) / double(cache_reads + cache_writes);
-<<<<<<< HEAD
 
-=======
-/*
-	temp_trace_log << "TotAccess: " << cache_reads + cache_writes 
-				   << " MissRate: " << miss_rate  
-				   << " CurrentTIme: " << cur_time_ms << std::endl;
-*/
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 	m_stacked_dram_unison->clearCacheStats();
 }
 
@@ -955,14 +936,10 @@ timeDuration(std::chrono::steady_clock::time_point t1, std::chrono::steady_clock
 void
 StatsManager::recordStats(String prefix)
 {
-<<<<<<< HEAD
 	std::cout << "\n************recordStats once at " << m_current_time.getUS() << std::endl;
 
 	auto start = std::chrono::steady_clock::now();
 	std::cout << "[TIME_REC]Current Time in Chrono: " << timeDuration(start, last_time_point) << std::endl;
-=======
-	//std::cout << "recordStats once at " << m_current_time.getUS() << std::endl;
->>>>>>> d3023cf79352c5baa92f879fb03af4b7c04849d9
 
 	m_record_interval = m_current_time - m_last_record_time;
 	if (m_record_interval == SubsecondTime::Zero()) {

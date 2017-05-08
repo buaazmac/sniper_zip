@@ -35,12 +35,22 @@ DramModel::~DramModel()
 {
 	std::cout << "[RAMULATOR OUTPUT]" << std::endl;
 	std::cout << "\n**Total Ticks: " << tot_ticks << std::endl;
+	std::cout << "\n**Ramulator Active Cycles: " << memory->ramulator_active_cycles.value() << std::endl;
+	std::cout << "\n**DRAM Cycles: " << memory->num_dram_cycles.value() << std::endl;
+	std::cout << "\n**Maximum Bandwidth: " << memory->maximum_bandwidth.value() << std::endl;
+	std::cout << "\nNumber of Incoming Requests: " << memory->num_incoming_requests.value() << std::endl;
 	std::cout << "\n**Serving Request**\n";
 	for (int i = 0; i < C; i++) {
 		std::cout << "Channel_" << i << ": "
 				  << "serving reads(" << getVaultRdReq(i) << "), "
 				  << "serving writes(" << getVaultWrReq(i) << ")." << endl;
 	}
+	/*
+	std::cout << "\n**Latencies**\n";
+	for (auto it = latencies.begin(); it != latencies.end(); it++) {
+		std::cout << "Latency: " << it->first << ", Numbers: " << it->second << std::endl;
+	}
+	*/
 	std::cout << "[RAMULATOR OUTPUT]" << std::endl;
 }
 
@@ -162,11 +172,31 @@ int DramModel::getReadLatency(int vault)
 	return rd_latency;
 }
 
+int DramModel::getPrevLatency()
+{
+	int tot_clks = 0;
+	for (auto it = latencies.begin(); it != latencies.end(); it++) {
+		tot_clks += it->first * it->second;
+	}
+	latencies.clear();
+	return tot_clks;
+}
+
 uint64_t DramModel::getTotTime()
 {
 	uint64_t t_ck = (uint64_t)tCK;
 	uint64_t dram_cycles = memory->num_dram_cycles.value();
 	return dram_cycles * t_ck;
+}
+
+double DramModel::getVaultQueLenAvg(int vault) 
+{
+	return double(memory->ctrls[vault]->req_queue_length_avg.value());
+}
+
+double DramModel::getVaultQueLenSum(int vault)
+{
+	return double(memory->ctrls[vault]->req_queue_length_sum.value());
 }
 
 uint64_t DramModel::getVaultRdReq(int vault)
@@ -202,6 +232,24 @@ uint64_t DramModel::getVaultRowHits(int vault)
 	uint64_t rd_row_hits = memory->ctrls[vault]->read_row_hits[0].value();
 	uint64_t wr_row_hits = memory->ctrls[vault]->write_row_hits[0].value();
 	return (rd_row_hits + wr_row_hits);
+}
+
+uint64_t DramModel::getBankRowHits(int vault, int bank)
+{
+	uint64_t bank_hits = memory->ctrls[vault]->bank_read_row_hits[bank].value() + memory->ctrls[vault]->bank_write_row_hits[bank].value();
+	return bank_hits;
+}
+
+uint64_t DramModel::getBankRowConflicts(int vault, int bank)
+{
+	uint64_t bank_conflicts = memory->ctrls[vault]->bank_read_row_conflicts[bank].value() + memory->ctrls[vault]->bank_write_row_conflicts[bank].value();
+	return bank_conflicts;
+}
+
+uint64_t DramModel::getBankRowMisses(int vault, int bank)
+{
+	uint64_t bank_misses = memory->ctrls[vault]->bank_read_row_misses[bank].value() + memory->ctrls[vault]->bank_write_row_misses[bank].value();
+	return bank_misses;
 }
 
 uint64_t DramModel::getBankActTime(int vault, int bank)

@@ -12,7 +12,7 @@
 // Statistics
 struct VaultStatEntry {
 	SubsecondTime tACT, tPRE, tRD, tWR;
-	UInt32 reads, writes, row_hits;
+	UInt32 reads, writes, row_hits, que_len;
 };
 
 class VaultPerfModel {

@@ -101,8 +101,10 @@ namespace ramulator {
   void Refresh::inject_bank_refresh(int bank_i) {
 	  int r_i = bank_i / max_bank_count,
 		  b_i = bank_i % max_bank_count;
+/*
 	  std::cout << "Here we inject a bank refresh on " << ctrl->channel->id
 				<< " " << r_i << " " << b_i << std::endl;
+*/
 	  refresh_target(ctrl, r_i, b_i, -1);
 	  bank_refreshed[bank_i] = clk;
   }
