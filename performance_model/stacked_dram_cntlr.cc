@@ -148,6 +148,7 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 
 	remapped = false;
 	enter_roi = false;
+	bank_level_remap = Sim()->getCfg()->getBoolDefault("perf_model/thermal/bank_level_remap", false);
 
 	v_remap_times = b_remap_times = 0;
 
@@ -524,17 +525,20 @@ StackedDramPerfUnison::clearCacheStats()
 void
 StackedDramPerfUnison::updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp)
 {
-
+	if (Sim()->getMagicServer()->inROI()) {
+		enter_roi = true;
+	}
 	m_remap_manager->updateTemperature(v, b, temperature, v_temp);
 	if (temperature >= 85) {
 		m_vaults_array[v]->m_banks_array[b]->stats.hot = true;
-		enter_roi = true;
-		m_dram_model->setBankRef(v, b, true);
+		if (bank_level_remap)
+			m_dram_model->setBankRef(v, b, true);
 		
 		//std::cout << " Set Higher Ref Freq in bank " << v << " " << b << std::endl;
 	} else {
 		m_vaults_array[v]->m_banks_array[b]->stats.hot = false;
-		m_dram_model->setBankRef(v, b, false);
+		if (bank_level_remap)
+			m_dram_model->setBankRef(v, b, false);
 	}
 }
 

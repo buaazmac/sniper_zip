@@ -24,7 +24,7 @@ DramModel::DramModel(const std::string& fname)
 	memory = new RamMemory(*configs, ctlrs);
 
 	/* Construct the initial request*/
-	read_complete = [this](RamRequest& r) {this->latencies[r.depart - r.arrive]++; };
+	read_complete = [this](RamRequest& r) {this->latencies[r.depart - r.arrive]++; this->overhead[r.depart - r.arrive] = r.depart;};
 
 	/* interval ticks initialization*/
 	interval_ticks = 500000;
@@ -175,10 +175,22 @@ int DramModel::getReadLatency(int vault)
 int DramModel::getPrevLatency()
 {
 	int tot_clks = 0;
+	int t1 = tot_ticks, t2 = 0;
 	for (auto it = latencies.begin(); it != latencies.end(); it++) {
 		tot_clks += it->first * it->second;
 	}
+	for (auto it = overhead.begin(); it != overhead.end(); it++) {
+		if (it->second - it->first < t1) {
+			t1 = it->second - it->first;
+		}
+		if (it->second > t2) {
+			t2 = it->second;
+		}
+	}
 	latencies.clear();
+	overhead.clear();
+	if (t2 - t1 > 0)
+		tot_clks = t2 - t1;
 	return tot_clks;
 }
 

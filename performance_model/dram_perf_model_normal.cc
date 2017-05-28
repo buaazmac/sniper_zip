@@ -631,8 +631,6 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 
 SubsecondTime
 StackDramCacheCntlrUnison::handleDramAccess(SubsecondTime pkt_time, UInt32 pkt_size, UInt32 set_n, DramCntlrInterface::access_t access_type, ShmemPerf *perf) {
-	if (pkt_time.getNS() % 100000  == 0)
-		std::cout << "Here is a mem req at " << pkt_time.getNS() << std::endl; 
 	UInt32 bandwidth = 128;
 	int req_times = pkt_size / bandwidth;
 	if (req_times < 1) {
@@ -647,13 +645,6 @@ StackDramCacheCntlrUnison::handleDramAccess(SubsecondTime pkt_time, UInt32 pkt_s
 		perf->updateTime(pkt_time, ShmemPerf::DRAM_QUEUE);
 		perf->updateTime(pkt_time + delay);
 	}
-	//delay += SubsecondTime::US(10);
-	/*
-	std::cout << "[Handle Dram Access] " 
-			  << "pkt_time: " << pkt_time
-			  << ", pkt_size: " << pkt_size 
-			  << ", delay: " << delay.getNS() << std::endl;
-			  */
 	return delay;
 }
 

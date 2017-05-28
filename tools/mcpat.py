@@ -1211,7 +1211,7 @@ def readTemplate(ncores, num_l2s, private_l2s, num_l3s, technology_node):
   template.append(["\t\t\t<param name=\"vdd\" value=\"0\"/><!-- 0 means using ITRS default vdd -->",""])
   template.append(["\t\t\t<param name=\"peak_transfer_rate\" value=\"3200\"/>",""])
   template.append(["\t\t\t<param name=\"block_size\" value=\"64\"/><!--B-->",""])
-  template.append(["\t\t\t<param name=\"number_mcs\" value=\"0\"/>",""])
+  template.append(["\t\t\t<param name=\"number_mcs\" value=\"1\"/>",""])
   template.append(["\t\t\t<!-- current McPAT only supports homogeneous memory controllers -->",""])
   template.append(["\t\t\t<param name=\"memory_channels_per_mc\" value=\"1\"/>",""])
   template.append(["\t\t\t<param name=\"number_ranks\" value=\"2\"/>",""])

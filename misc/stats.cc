@@ -206,6 +206,16 @@ StatsManager::init()
    int remap_interval_us = Sim()->getCfg()->getInt("perf_model/remap_config/remap_interval");
    RemapInterval = SubsecondTime::US(remap_interval_us);
    do_remap = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/remap", false);
+   reverse_flp = Sim()->getCfg()->getBoolDefault("perf_model/thermal/reverse", false);
+
+   /* Initialization of frequency table for DVFS*/
+   freq_table.push_back(532);
+   freq_table.push_back(1064);
+   freq_table.push_back(1596);
+   freq_table.push_back(2128);
+   freq_table.push_back(2660);
+   freq_lev = freq_table.size() - 1;
+   max_lev = freq_table.size() - 1;
 
    first_ttrace = false;
 
@@ -236,6 +246,60 @@ StatsManager::recordMetricName(UInt64 keyId, std::string objectName, std::string
    sqlite3_bind_text(m_stmt_insert_name, 3, metricName.c_str(), -1, SQLITE_TRANSIENT);
    res = sqlite3_step(m_stmt_insert_name);
    LOG_ASSERT_ERROR(res == SQLITE_DONE, "Error executing SQL statement");
+}
+
+void
+StatsManager::checkDTM(const vector<double> cpu_temp, double dram_temp)
+{
+	double cpu_temp_thres = Sim()->getCfg()->getInt("perf_model/thermal/cpu_temp_thres"), 
+		   dram_temp_thres = Sim()->getCfg()->getInt("perf_model/thermal/dram_temp_thres");
+	double max_temp = 0;
+	int control_method = Sim()->getCfg()->getInt("perf_model/thermal/dtm_method");
+	for (UInt32 i = 0; i < cpu_temp.size(); i++) {
+		if (cpu_temp[i] > max_temp) max_temp = cpu_temp[i];
+	}
+	printf("[DTM Trigger] CPU_MAX(THRES): %.3lf(%.3lf), DRAM_MAX(THRES): %.3lf(%.3lf)\n\tCurrent DTM method: %d\n", 
+			max_temp, cpu_temp_thres, dram_temp, dram_temp_thres, control_method);
+
+	if (control_method == 0) {
+		// 0: No operation on high temperature
+		return;
+	} else if (control_method == 1) {
+		// 1: DVFS considering only CPU temperature
+		if (max_temp > cpu_temp_thres) {
+			std::cout << "[HOT!] CPU is too hot!\n";
+			if (freq_lev > 0) {
+				freq_lev--;
+				setGlobalFrequency(freq_table[freq_lev]);
+			}
+		} else {
+			if (freq_lev < max_lev) {
+				freq_lev++;
+				setGlobalFrequency(freq_table[freq_lev]);
+			}
+		}
+	} else if (control_method == 2) {
+		// 2: DVFS considering both CPU and DRAM temperature
+		
+		if (max_temp > cpu_temp_thres || dram_temp > dram_temp_thres) {
+			if (max_temp > cpu_temp_thres) {
+				std::cout << "[HOT!] CPU is too hot!\n";
+			} else {
+				std::cout << "[HOT!] DRAM is too hot!\n";
+			}
+			if (freq_lev > 0) {
+				freq_lev--;
+				setGlobalFrequency(freq_table[freq_lev]);
+			}
+		} else {
+			if (freq_lev < max_lev) {
+				freq_lev++;
+				setGlobalFrequency(freq_table[freq_lev]);
+			}
+		}
+	} else {
+		std::cout << "[DTM Trigger] Unrecognized DTM method!\n";
+	}
 }
 
 void
@@ -300,6 +364,8 @@ StatsManager::computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, Subsecond
 	if (act_t > tot_time) {
 		//std::cout << "[Potetial Error] tACT > tTOT\n";
 		act_t = tot_time;
+		if (pre_t > act_t)
+			pre_t = act_t;
 	}
 	double read_ratio = 0,
 		   write_ratio = 0;
@@ -316,9 +382,6 @@ StatsManager::computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, Subsecond
     double cke_lo_act = 0;
     double wr_sch = 0.01;
     double rd_sch = 0.01;
-    int rd_per = 50;
-	if (reads + writes != 0)
-		rd_per = (100 * reads) / (reads + write_t);
 
 	/*set the real value*/
 	bnk_pre = double((tot_time - act_t) / tot_time);
@@ -350,7 +413,7 @@ StatsManager::computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, Subsecond
 }
 
 double
-StatsManager::computeDramCntlrPower(UInt32 reads, UInt32 writes, SubsecondTime t)
+StatsManager::computeDramCntlrPower(UInt32 reads, UInt32 writes, SubsecondTime t, UInt32 tot_access)
 {
 	double tot_time = double(t.getFS()) * 1.0e-15;
 	double ncycles = tot_time * dram_cntlr_table.DRAM_CLK * 1e6;
@@ -366,8 +429,18 @@ StatsManager::computeDramCntlrPower(UInt32 reads, UInt32 writes, SubsecondTime t
 	}
 	double power_chip_dyn = read_dc * dram_cntlr_table.DRAM_POWER_READ + write_dc * dram_cntlr_table.DRAM_POWER_WRITE;
 	double power_socket_dyn = power_chip_dyn * dram_cntlr_table.chips_per_dimm * dram_cntlr_table.dimms_per_socket;
-	//std::cout << "[ComputeCntrlPower] reads: " << reads << ", writes: " << writes << ", time: " << t.getNS() << ", **Result: " << power_socket_dyn * sockets << std::endl;
-	return power_socket_dyn * sockets;
+	double raw_power = power_socket_dyn * sockets;
+	double ratio = 0;
+	if (tot_access != 0)
+		ratio = double(reads + writes) / double(tot_access);
+	if (ratio > 1) ratio = 1;
+	double real_power = power_mc * 32 * ratio;
+	if (ratio == 0) 
+		real_power = power_mc;
+	if (raw_power > real_power)
+		raw_power = real_power;
+	
+	return real_power;
 }
 
 void
@@ -414,9 +487,9 @@ StatsManager::dumpDramPowerTrace()
 		if (tot_access != 0) 
 			row_hit_rate = (float)tot_row_hits / (float)tot_access;
 
-		dram_stats_file << "Total time: " << tot_ACT << ", " << tot_PRE << ", " << tot_RD << ", " << tot_WR << std::endl;
-		dram_stats_file << "Total access: "  << tot_access << ", Row Hit Rate: " << row_hit_rate << std::endl;
-		dram_stats_file << "@" << std::endl;
+		//dram_stats_file << "Total time: " << tot_ACT << ", " << tot_PRE << ", " << tot_RD << ", " << tot_WR << std::endl;
+		//dram_stats_file << "Total access: "  << tot_access << ", Row Hit Rate: " << row_hit_rate << std::endl;
+		//dram_stats_file << "@" << std::endl;
    }
 
    /*
@@ -459,9 +532,9 @@ StatsManager::dumpDramPowerTrace()
 		if (tot_access != 0) 
 			row_hit_rate = (float)tot_row_hits / (float)tot_access;
 
-		dram_stats_file << "Total time: " << tot_ACT << ", " << tot_PRE << ", " << tot_RD << ", " << tot_WR << std::endl;
-		dram_stats_file << "Total access: "  << tot_access << ", Row Hit Rate: " << row_hit_rate << std::endl;
-		dram_stats_file << "@" << std::endl;
+		//dram_stats_file << "Total time: " << tot_ACT << ", " << tot_PRE << ", " << tot_RD << ", " << tot_WR << std::endl;
+		//dram_stats_file << "Total access: "  << tot_access << ", Row Hit Rate: " << row_hit_rate << std::endl;
+		//dram_stats_file << "@" << std::endl;
    }
 
    /*
@@ -503,9 +576,9 @@ StatsManager::dumpDramPowerTrace()
 		if (tot_access != 0) 
 			row_hit_rate = (float)tot_row_hits / (float)tot_access;
 
-		dram_stats_file << "Total time: " << tot_ACT << ", " << tot_PRE << ", " << tot_RD << ", " << tot_WR << std::endl;
-		dram_stats_file << "Total access: "  << tot_access << ", Row Hit Rate: " << row_hit_rate << std::endl;
-		dram_stats_file << "@" << std::endl;
+		//dram_stats_file << "Total time: " << tot_ACT << ", " << tot_PRE << ", " << tot_RD << ", " << tot_WR << std::endl;
+		//dram_stats_file << "Total access: "  << tot_access << ", Row Hit Rate: " << row_hit_rate << std::endl;
+		//dram_stats_file << "@" << std::endl;
    }
 #endif
 }
@@ -514,6 +587,147 @@ void
 StatsManager::updateBankStat(int i, int j, BankPerfModel* bank)
 {
 	bank_stats[i][j] = bank->stats;
+}
+
+void
+StatsManager::recordPowerTrace()
+{
+		/* Here we output power trace for drawing picture*/
+		for (int i = 0; i < 4; i++) {
+			power_trace_log << power_ialu[i] << "\t" << power_fpalu[i] 
+					<< "\t" << power_inssch[i] << "\t" << power_l1i[i]
+					<< "\t" << power_insdec[i] << "\t" << power_bp[i]
+					<< "\t" << power_ru[i] << "\t" << power_l1d[i]
+					<< "\t" << power_mmu[i] << "\t" << power_l2[i] << " | \t";
+		}
+		for (int i = 0; i < 32; i++) {
+			power_trace_log << vault_power[i] << "\t";
+		}
+		power_trace_log << " | ";
+		for (int j = 0; j < 8; j++) {
+			for (int i =0; i < 32; i++) {
+				power_trace_log << bank_power[i][j] << "\t";
+			}
+		}
+		power_trace_log << std::endl;
+		/**/
+}
+
+void
+StatsManager::updatePower()
+{
+	power_mc = double(getMetricObject("mc", 0, "power-dynamic")->recordMetric()) * 1.0e-6;
+	for (int i = 0; i < 4; i++) {
+		power_exe[i] = double(getMetricObject("exe", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_ifetch[i] = double(getMetricObject("ifetch", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_lsu[i] = double(getMetricObject("lsu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_mmu[i] = double(getMetricObject("mmu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_l2[i] = double(getMetricObject("l2", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_ru[i] = double(getMetricObject("ru", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_ialu[i] = double(getMetricObject("ialu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_fpalu[i] = double(getMetricObject("fpalu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_inssch[i] = double(getMetricObject("inssch", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_l1i[i] = double(getMetricObject("l1i", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_insdec[i] = double(getMetricObject("insdec", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_bp[i] = (double(getMetricObject("btb", i, "power-dynamic")->recordMetric()) + double(getMetricObject("btb", i, "power-dynamic")->recordMetric())) * 1.0e-6;
+		power_l1d[i] = double(getMetricObject("l1d", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+	}
+
+	/* Set of time interval*/
+	SubsecondTime tot_time = m_record_interval;
+
+//	UInt32 n_banks = 8;
+//	UInt32 n_vaults = m_stacked_dram_unison->n_vaults;
+	UInt32 v_r[32], v_w[32];
+	UInt32 tot_access = 0;
+
+   if (m_stacked_dram_unison != NULL) {
+
+		for (UInt32 i = 0; i < m_stacked_dram_unison->n_vaults; i++) {
+			//double std_power = 0;
+			VaultPerfModel* vault = m_stacked_dram_unison->m_vaults_array[i];
+			//n_banks = vault->n_banks;
+
+			UInt32 tot_reads, tot_writes;
+			tot_reads = vault->stats.reads - vault_reads[i];
+			tot_writes = vault->stats.writes - vault_writes[i];
+			//tot_row_hits = vault->stats.row_hits - vault_row_hits[i];
+			v_r[i] = tot_reads;
+			v_w[i] = tot_writes;
+
+			// Update Vault Stats
+			vault_reads[i] = vault->stats.reads;
+			vault_writes[i] = vault->stats.writes;
+			vault_row_hits[i] = vault->stats.row_hits;
+
+			for (UInt32 j = 0; j < vault->n_banks; j++) {
+				BankPerfModel* bank = vault->m_banks_array[j];
+				bank_stats_interval[i][j] = bank->stats;
+				bank_stats_interval[i][j].tACT -= bank_stats[i][j].tACT;
+				bank_stats_interval[i][j].tPRE -= bank_stats[i][j].tPRE;
+				bank_stats_interval[i][j].reads -= bank_stats[i][j].reads;
+				bank_stats_interval[i][j].writes -= bank_stats[i][j].writes;
+				bank_stats_interval[i][j].row_hits -= bank_stats[i][j].row_hits;
+				bank_stats_interval[i][j].row_conflicts -= bank_stats[i][j].row_conflicts;
+				bank_stats_interval[i][j].row_misses -= bank_stats[i][j].row_misses;
+
+				bank_stats_interval[i][j].tRD = SubsecondTime::Zero();
+				bank_stats_interval[i][j].tWR = SubsecondTime::Zero();
+				bank_stats_interval[i][j].hot = bank_stats[i][j].hot;
+
+				/*Update current bank statistics*/
+				updateBankStat(i, j, bank);
+
+				BankStatEntry *tmp = &bank_stats_interval[i][j];
+
+				double page_hit_rate = 0;
+				if (tmp->row_hits + tmp->row_misses + tmp->row_conflicts > 0) {
+					page_hit_rate = tmp->row_hits / (tmp->row_hits + tmp->row_misses + tmp->row_conflicts);
+				}
+				double bnk_pre, cke_lo_pre = 0.3, wr_sch, rd_sch, vdd_use = 1.5;
+				bool hot = tmp->hot;
+				if (tot_time.getNS() != 0) {
+					bnk_pre = (1 - double(tmp->tACT.getNS())/double(tot_time.getNS()));
+					if (bnk_pre < 0) bnk_pre = 0;
+				} else {
+					bnk_pre = 0;
+				}
+
+				if (tmp->reads + tmp->writes > 0) {
+					wr_sch = double(tmp->writes) / double(tmp->reads + tmp->writes) * (1 - bnk_pre);
+					rd_sch = double(tmp->reads) / double(tmp->reads + tmp->writes) * (1 - bnk_pre);
+				} else {
+					wr_sch = 0;
+					rd_sch = 0;
+				}
+				bank_power[i][j] = computeBankPower(bnk_pre, cke_lo_pre, page_hit_rate, wr_sch, rd_sch, hot, vdd_use);
+			}
+			//vault_power[i] = computeDramCntlrPower(tot_reads, tot_writes, tot_time);
+			vault_access[i] = tot_reads + tot_writes;
+			tot_access += vault_access[i];
+		}
+   }
+
+   for (UInt32 i = 0; i < m_stacked_dram_unison->n_vaults; i++) {
+	   vault_power[i] = computeDramCntlrPower(v_r[i], v_w[i], tot_time, tot_access);
+   }
+/*
+   Here we can choose to measure the results of 2.5D model
+   In which, we turn off the power of CPU components
+ */
+#ifdef __ONLY_DRAM__
+	/*
+	power_L3 = 0;
+	for (int i = 0; i < 4; i++) {
+		power_exe[i] = 0;
+		power_ifetch[i] = 0;
+		power_lsu[i] = 0;
+		power_mmu[i] = 0;
+		power_l2[i] = 0;
+		power_ru[i] = 0;
+	}
+	*/
+#endif
 }
 
 void
@@ -530,14 +744,6 @@ StatsManager::dumpHotspotInput()
 	pt_file.open("./HotSpot/powertrace.input");
 	//pt_file << "L3";
 	for (int i = 0; i < 4; i++) {
-		/*
-		pt_file << "\texe_" << i;
-		pt_file << "\tifetch_" << i;
-		pt_file << "\tlsu_" << i;
-		pt_file << "\tmmu_" << i;
-		pt_file << "\tl2_" << i;
-		pt_file << "\tru_" << i;
-		*/
 		pt_file << "ialu_" << i << "\t";
 		pt_file << "fpalu_" << i << "\t";
 		pt_file << "inssch_" << i << "\t";
@@ -576,184 +782,19 @@ StatsManager::dumpHotspotInput()
 			}
 		}
 		pt_file << std::endl;
-
-		/* Here we output power trace for drawing picture*/
-		for (int i = 0; i < 4; i++) {
-			power_trace_log << power_ialu[i] << "\t" << power_fpalu[i] 
-					<< "\t" << power_inssch[i] << "\t" << power_l1i[i]
-					<< "\t" << power_insdec[i] << "\t" << power_bp[i]
-					<< "\t" << power_ru[i] << "\t" << power_l1d[i]
-					<< "\t" << power_mmu[i] << "\t" << power_l2[i] << " | \t";
-		}
-		for (int i = 0; i < 32; i++) {
-			power_trace_log << vault_power[i] << "\t";
-		}
-		power_trace_log << " | ";
-		for (int j = 0; j < 8; j++) {
-			for (int i =0; i < 32; i++) {
-				power_trace_log << bank_power[i][j] << "\t";
-			}
-		}
-		power_trace_log << std::endl;
-		/**/
-	}
-//for (int pt_it = 0; pt_it < 2; pt_it++) {
-	/*
-		Here we update power statistics!
-	 */
-	//power_L3 = double(getMetricObject("L3", 0, "power-dynamic")->recordMetric()) * 1.0e-6;
-	//pt_file << power_L3;
-	for (int i = 0; i < 4; i++) {
-		power_exe[i] = double(getMetricObject("exe", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_ifetch[i] = double(getMetricObject("ifetch", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_lsu[i] = double(getMetricObject("lsu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_mmu[i] = double(getMetricObject("mmu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_l2[i] = double(getMetricObject("l2", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_ru[i] = double(getMetricObject("ru", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_ialu[i] = double(getMetricObject("ialu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_fpalu[i] = double(getMetricObject("fpalu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_inssch[i] = double(getMetricObject("inssch", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_l1i[i] = double(getMetricObject("l1i", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_insdec[i] = double(getMetricObject("insdec", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_bp[i] = (double(getMetricObject("btb", i, "power-dynamic")->recordMetric()) + double(getMetricObject("btb", i, "power-dynamic")->recordMetric())) * 1.0e-6;
-		power_l1d[i] = double(getMetricObject("l1d", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		
+		/* DEBUG: Here Record Power Trace*/
+		recordPowerTrace();
 	}
 
-	/* Set of time interval*/
-	SubsecondTime tot_time = m_record_interval;
 
-	UInt32 n_banks = 8;
-	UInt32 n_vaults = m_stacked_dram_unison->n_vaults;
+	/* Here we update the power data*/
+	updatePower();
 
-	//std::ofstream test_file;
-	//test_file.open("./runtime_data.txt", std::ofstream::out | std::ofstream::app);
-
-   if (m_stacked_dram_unison != NULL) {
-
-	   //test_file << "-----------OUTPUT_DATA-----------------" << std::endl;
-
-		for (UInt32 i = 0; i < m_stacked_dram_unison->n_vaults; i++) {
-			double std_power = 0;
-			VaultPerfModel* vault = m_stacked_dram_unison->m_vaults_array[i];
-			n_banks = vault->n_banks;
-
-			UInt32 tot_reads, tot_writes, tot_row_hits;
-			tot_reads = vault->stats.reads - vault_reads[i];
-			tot_writes = vault->stats.writes - vault_writes[i];
-			tot_row_hits = vault->stats.row_hits - vault_row_hits[i];
-
-			if (i == 0) std::cout << tot_reads << " " << tot_writes << " " << tot_row_hits << std::endl;
-
-			// Update Vault Stats
-			vault_reads[i] = vault->stats.reads;
-			vault_writes[i] = vault->stats.writes;
-			vault_row_hits[i] = vault->stats.row_hits;
-
-			for (UInt32 j = 0; j < vault->n_banks; j++) {
-				BankPerfModel* bank = vault->m_banks_array[j];
-				bank_stats_interval[i][j] = bank->stats;
-				bank_stats_interval[i][j].tACT -= bank_stats[i][j].tACT;
-				bank_stats_interval[i][j].tPRE -= bank_stats[i][j].tPRE;
-				bank_stats_interval[i][j].reads -= bank_stats[i][j].reads;
-				bank_stats_interval[i][j].writes -= bank_stats[i][j].writes;
-				bank_stats_interval[i][j].row_hits -= bank_stats[i][j].row_hits;
-				bank_stats_interval[i][j].row_conflicts -= bank_stats[i][j].row_conflicts;
-				bank_stats_interval[i][j].row_misses -= bank_stats[i][j].row_misses;
-
-				bank_stats_interval[i][j].tRD = SubsecondTime::Zero();
-				bank_stats_interval[i][j].tWR = SubsecondTime::Zero();
-				bank_stats_interval[i][j].hot = bank_stats[i][j].hot;
-
-				//printf("#####init: %d, interval: %d, total: %d\n", bank->stats.reads, bank_stats_interval[i][j].reads, bank_stats[i][j].reads);
-
-				/*Update current bank statistics*/
-				updateBankStat(i, j, bank);
-
-				BankStatEntry *tmp = &bank_stats_interval[i][j];
-
-				double page_hit_rate = 0;
-				if (tmp->row_hits + tmp->row_misses + tmp->row_conflicts > 0) {
-					page_hit_rate = tmp->row_hits / (tmp->row_hits + tmp->row_misses + tmp->row_conflicts);
-				}
-				double bnk_pre, cke_lo_pre = 0.3, wr_sch, rd_sch, vdd_use = 1.5;
-				bool hot = tmp->hot;
-				if (tot_time.getNS() != 0) {
-					bnk_pre = (1 - double(tmp->tACT.getNS())/double(tot_time.getNS()));
-					if (bnk_pre < 0) bnk_pre = 0;
-				} else {
-					bnk_pre = 0;
-				}
-
-				if (tmp->reads + tmp->writes > 0) {
-					wr_sch = double(tmp->writes) / double(tmp->reads + tmp->writes) * (1 - bnk_pre);
-					rd_sch = double(tmp->reads) / double(tmp->reads + tmp->writes) * (1 - bnk_pre);
-				} else {
-					wr_sch = 0;
-					rd_sch = 0;
-				}
-				bank_power[i][j] = computeBankPower(bnk_pre, cke_lo_pre, page_hit_rate, wr_sch, rd_sch, hot, vdd_use);
-				
-				//bank_power[i][j] = computeDramPower(tmp->tACT, tmp->tPRE, tmp->tRD, tmp->tWR, tot_time, tmp->reads, tmp->writes, page_hit_rate);
-				//std_power += bank_power[i][j];
-
-
-				/*
-				test_file << "bank_" << i << "_" << j
-						  << ": power: " << bank_power[i][j]
-						  << ", reads: " << tmp->reads
-						  << ", writes: " << tmp->writes
-						  << ", t_act: " << tmp->tACT.getUS()
-						  << ", t_pre: " << tmp->tPRE.getUS()
-						  << ", t_rd: " << tmp->tRD.getUS()
-						  << ", t_wr: " << tmp->tWR.getUS()
-						  << ", t_tot: " << tot_time.getUS()
-						  << ", page_hit: " << page_hit_rate
-						  <<std::endl;
-				*/
-				//tot_reads += tmp->reads;
-				//tot_writes += tmp->writes;
-			}
-			vault_power[i] = computeDramCntlrPower(tot_reads, tot_writes, tot_time);
-			vault_access[i] = tot_reads + tot_writes;
-
-			/*
-			test_file << "---------------------------" << std::endl;
-			test_file << "vault_" << i 
-				<< ": power: " << vault_power[i]
-				<< ", reads: " << tot_reads
-				<< ", writes: " << tot_writes << std::endl;
-			*/
-		}
-   }
-
-
-/*
-   Here we can choose to measure the results of 2.5D model
-   In which, we turn off the power of CPU components
- */
-#ifdef __ONLY_DRAM__
-	/*
-	power_L3 = 0;
-	for (int i = 0; i < 4; i++) {
-		power_exe[i] = 0;
-		power_ifetch[i] = 0;
-		power_lsu[i] = 0;
-		power_mmu[i] = 0;
-		power_l2[i] = 0;
-		power_ru[i] = 0;
-	}
-	*/
-#endif
-
+	/* Here we output the second trace of HotSpot Input*/
 	for (int pt = 0; pt < 1; pt ++) {
-		//pt_file << power_L3;
 
 		for (int i = 0; i < 4; i++) {
-			/*
-			pt_file << "\t" << power_exe[i] << "\t" << power_ifetch[i] 
-					<< "\t" << power_lsu[i] << "\t" << power_mmu[i]
-					<< "\t" << power_l2[i] << "\t" << power_ru[i];
-					*/
 			pt_file << power_ialu[i] << "\t" << power_fpalu[i] 
 					<< "\t" << power_inssch[i] << "\t" << power_l1i[i]
 					<< "\t" << power_insdec[i] << "\t" << power_bp[i]
@@ -772,14 +813,98 @@ StatsManager::dumpHotspotInput()
 	}
 
 	pt_file.close();
-	//test_file.close();
-	//std::cout << "[STAT_DEBUG] End Dumping HotspotInput" << std::endl;
+}
+
+void
+StatsManager::dumpHotspotInputReverse()
+{
+	/* Here we dump input for hotspot
+	 * init_file(tmp.steady) from last time
+	 * -p powertrace.input
+	 */
+
+/* Write down power trace*/
+	std::ofstream pt_file;
+	pt_file.open("./HotSpot/powertrace.input");
+	for (int j = 0; j < 8; j++) {
+		for (int i = 0; i < 32; i++) {
+			pt_file << "dram_" << i << "_" << j << "\t";
+		}
+	}
+	for (int i = 0; i < 32; i++) {
+		pt_file << "dram_ctlr_" << i << "\t";
+	}
+	//pt_file << "L3";
+	for (int i = 0; i < 4; i++) {
+		pt_file << "ialu_" << i << "\t";
+		pt_file << "fpalu_" << i << "\t";
+		pt_file << "inssch_" << i << "\t";
+		pt_file << "l1i_" << i << "\t";
+		pt_file << "insdec_" << i << "\t";
+		pt_file << "bp_" << i << "\t";
+		pt_file << "ru_" << i << "\t";
+		pt_file << "l1d_" << i << "\t";
+		pt_file << "mmu_" << i << "\t";
+		pt_file << "l2_" << i << "\t";
+	}
+	pt_file << std::endl;
+	/* We first write down the last power trace*/
+	for (int pt = 0; pt < 1; pt ++) {
+		for (int i = 0; i < 32; i++) {
+			pt_file << vault_power[i] << "\t";
+		}
+		for (int j = 0; j < 8; j++) {
+			for (int i =0; i < 32; i++) {
+				pt_file << bank_power[i][j] << "\t";
+			}
+		}
+		for (int i = 0; i < 4; i++) {
+			pt_file << power_ialu[i] << "\t" << power_fpalu[i] 
+					<< "\t" << power_inssch[i] << "\t" << power_l1i[i]
+					<< "\t" << power_insdec[i] << "\t" << power_bp[i]
+					<< "\t" << power_ru[i] << "\t" << power_l1d[i]
+					<< "\t" << power_mmu[i] << "\t" << power_l2[i] << "\t";
+		}
+		pt_file << std::endl;
+
+		/* DEBUG: Here Record Power Trace*/
+		recordPowerTrace();
+
+	}
+
+
+	/* Here we update the power data*/
+	updatePower();
+
+	/* Here we output the second trace of HotSpot Input*/
+	for (int pt = 0; pt < 1; pt ++) {
+
+		
+		for (int j = 0; j < 8; j++) {
+			for (int i =0; i < 32; i++) {
+				pt_file << bank_power[i][j] << "\t";
+			}
+		}
+		for (int i = 0; i < 32; i++) {
+			pt_file << vault_power[i] << "\t";
+		}
+		for (int i = 0; i < 4; i++) {
+			pt_file << power_ialu[i] << "\t" << power_fpalu[i] 
+					<< "\t" << power_inssch[i] << "\t" << power_l1i[i]
+					<< "\t" << power_insdec[i] << "\t" << power_bp[i]
+					<< "\t" << power_ru[i] << "\t" << power_l1d[i]
+					<< "\t" << power_mmu[i] << "\t" << power_l2[i] << "\t";
+		}
+		pt_file << std::endl;
+	}
+
+	pt_file.close();
 }
 
 void
 StatsManager::callHotSpot()
 {
-	std::cout << "[STAT_DEBUG] Begin Calling HotSpot" << std::endl;
+	//std::cout << "[STAT_DEBUG] Begin Calling HotSpot" << std::endl;
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 	char *argv[17];
 	if (first_ttrace == false) {
@@ -798,6 +923,10 @@ StatsManager::callHotSpot()
 		argv[11] = "-grid_layer_file";
 		argv[12] = "./HotSpot/test_3D.lcf";
 
+		if (reverse_flp) {
+			argv[12] = "./HotSpot/reverse_3D.lcf";
+		}
+
 		hotspot->calculateTemperature(unit_temp, 13, argv);
 	} else {
 		int rename_rst;
@@ -811,7 +940,7 @@ StatsManager::callHotSpot()
 		}
 	}
 
-	std::cout << "[STAT_DEBUG] End first  Calling HotSpot" << std::endl;
+	//std::cout << "[STAT_DEBUG] End first  Calling HotSpot" << std::endl;
 	/*Second run to get final output*/
 	argv[1] = "-c";
 	argv[2] = "./HotSpot/hotspot.config";
@@ -830,13 +959,19 @@ StatsManager::callHotSpot()
 	argv[15] = "-steady_file";
 	argv[16] = "./HotSpot/tmp.steady.new";
 
-  	hotspot->calculateTemperature(unit_temp, 17, argv);
 
-	std::cout << "[STAT_DEBUG] End second Calling HotSpot" << std::endl;
+	if (reverse_flp)
+		argv[14] = "./HotSpot/reverse_3D.lcf";
+
+	hotspot->calculateTemperature(unit_temp, 17, argv);
+
+	//std::cout << "[STAT_DEBUG] End second Calling HotSpot" << std::endl;
 	/*Debug for temperature*/
 	double max_temp, max_cntlr_temp, max_bank_temp;
-	max_temp = max_cntlr_temp = max_bank_temp = 0;
-	char *s1, *s2, *s3;
+	double avg_temp_cpu, avg_temp_dram;
+	vector<double> core_avg_temp(4, 0.0);
+	vector<double> core_max_temp(4, 0.0);
+	max_temp = max_cntlr_temp = max_bank_temp = avg_temp_cpu = avg_temp_dram = 0;
 
 	temp_trace_log << "-------trace_" << ttrace_num << "-----"  
 				   << "current_interval: " << m_record_interval.getUS() << std::endl;
@@ -846,7 +981,15 @@ StatsManager::callHotSpot()
 	for (int i = 0; i < unit_num; i++) {
 		temp_trace_log << "[Sniper] UnitName: " << unit_names[i] << ", UnitTemp: " << unit_temp[i];
 		if (unit_temp[i] > max_temp) max_temp = unit_temp[i];
+		if (i < 40) {
+			avg_temp_cpu += unit_temp[i];
+			int core_id = i / 10;
+			core_avg_temp[core_id] += unit_temp[i];
+			if (core_max_temp[core_id] < unit_temp[i])
+				core_max_temp[core_id] = unit_temp[i];
+		}
 		if (i >= 40 && i < 72) {
+			avg_temp_dram += unit_temp[i];
 			temp_trace_log << ", Cntlr_" << i - 40 
 				<< " Power: " << vault_power[i-40] << ", Total Access: " << vault_access[i-40]; 
 			if (unit_temp[i] > max_cntlr_temp) max_cntlr_temp = unit_temp[i];
@@ -879,23 +1022,28 @@ StatsManager::callHotSpot()
 	}
 
 	/* Here we choose what to do with DVFS */
-	double cpu_temp_thres = Sim()->getCfg()->getInt("perf_model/thermal/cpu_temp_thres"), 
-		   dram_temp_thres = Sim()->getCfg()->getInt("perf_model/thermal/dram_temp_thres");
-	if (max_temp > cpu_temp_thres) {
-		setGlobalFrequency(1000);
-		//setGlobalFrequency(2660);
+	avg_temp_cpu /= 40;
+	avg_temp_dram /= 32;
+
+	for (int i = 0; i < 4; i++) {
+		core_avg_temp[i] /= 10;
+	}
+	int temp_t = Sim()->getCfg()->getInt("perf_model/thermal/temperature_type");
+	if (temp_t == 0) {
+		checkDTM(core_avg_temp, max_bank_temp);
 	} else {
-		setGlobalFrequency(2660);
-		//setGlobalFrequency(1000);
+		checkDTM(core_max_temp, max_bank_temp);
 	}
 
+	/*
 	int cache_reads = m_stacked_dram_unison->tot_reads,
 		cache_writes = m_stacked_dram_unison->tot_writes,
 	    cache_misses = m_stacked_dram_unison->tot_misses;
-	double miss_rate = 0;
-	double cur_time_ms = double(m_current_time.getFS()) * 1.0e-12;
-	if (cache_misses != 0)
-		miss_rate = double(cache_misses) / double(cache_reads + cache_writes);
+		*/
+	//double miss_rate = 0;
+	//double cur_time_ms = double(m_current_time.getFS()) * 1.0e-12;
+	//if (cache_misses != 0)
+	//	miss_rate = double(cache_misses) / double(cache_reads + cache_writes);
 
 	m_stacked_dram_unison->clearCacheStats();
 }
@@ -939,7 +1087,7 @@ StatsManager::recordStats(String prefix)
 	std::cout << "\n************recordStats once at " << m_current_time.getUS() << std::endl;
 
 	auto start = std::chrono::steady_clock::now();
-	std::cout << "[TIME_REC]Current Time in Chrono: " << timeDuration(start, last_time_point) << std::endl;
+	//std::cout << "[TIME_REC]Current Time in Chrono: " << timeDuration(start, last_time_point) << std::endl;
 
 	m_record_interval = m_current_time - m_last_record_time;
 	if (m_record_interval == SubsecondTime::Zero()) {
@@ -968,19 +1116,23 @@ StatsManager::recordStats(String prefix)
 
    auto end = std::chrono::steady_clock::now();
 
-   std::cout << "[TIME_REC]Time spent before dumpHotspotInput() is: " << timeDuration(end, start) << std::endl;
+   //std::cout << "[TIME_REC]Time spent before dumpHotspotInput() is: " << timeDuration(end, start) << std::endl;
    start = end;
 
    /*prepare power data for HotSpot*/
-   dumpHotspotInput();
+   if (reverse_flp == false)
+      dumpHotspotInput();
+   else
+      dumpHotspotInputReverse();
+
    end = std::chrono::steady_clock::now();
-   std::cout << "[TIME_REC]Time spent on dumpHotspotInput() is: " << timeDuration(end, start) << std::endl;
+   //std::cout << "[TIME_REC]Time spent on dumpHotspotInput() is: " << timeDuration(end, start) << std::endl;
    start = end;
 
    /* Call HotSpot in Sniper*/
    callHotSpot();
    end = std::chrono::steady_clock::now();
-   std::cout << "[TIME_REC]Time spent on callHotSpot() is: " << timeDuration(end, start) << std::endl;
+   //std::cout << "[TIME_REC]Time spent on callHotSpot() is: " << timeDuration(end, start) << std::endl;
    start = end;
 
    /* (REMAP_MAN) decide whether to remap*/

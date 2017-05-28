@@ -32,6 +32,7 @@ public:
 	std::vector<RamController*> ctlrs;
 	RamMemory* memory;
 	map<int, int> latencies;
+	map<int, int> overhead;
 	function<void(RamRequest&)> read_complete;
 	long interval_ticks;
 	long tot_ticks;

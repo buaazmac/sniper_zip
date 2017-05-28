@@ -125,6 +125,7 @@ class StatsManager
 	  /*Record the previous statistics*/
 	  SubsecondTime RemapInterval;
 	  bool do_remap;
+	  bool reverse_flp;
 
 	  SubsecondTime m_current_time;
 	  SubsecondTime m_last_remap_time;
@@ -142,7 +143,7 @@ class StatsManager
 	  /* Write power of dram*/
 	  double bank_power[32][8];
 	  double vault_power[32];
-	  double power_L3;
+	  double power_L3, power_mc;
 	  double power_exe[4], power_ifetch[4], power_lsu[4], power_mmu[4], power_l2[4], power_ru[4], power_ialu[4], power_fpalu[4], power_inssch[4], power_l1i[4], power_insdec[4], power_bp[4], power_l1d[4];
 	  int hot_access[32][8], cool_access[32][8], err_access[32][8];
 	  
@@ -151,6 +152,10 @@ class StatsManager
 	  char **unit_names;
 	  double *unit_temp;
 
+	  /* Frequency Vector*/
+	  std::vector<UInt64> freq_table; // MHz
+	  int freq_lev, max_lev;
+
 	  const char *ttrace_file = "./test_ttrace.txt";
 	  int ttrace_num;
 	  std::ofstream power_trace_log;
@@ -158,7 +163,10 @@ class StatsManager
 	  void dumpDramPowerTrace();
 	  void updateBankStat(int i, int j, BankPerfModel* bank);
 	  /*Hotspot*/
+	  void recordPowerTrace();
+	  void updatePower();
 	  void dumpHotspotInput();
+	  void dumpHotspotInputReverse();
 	  void callHotSpot();
 	  Hotspot *hotspot;
 	  /*Calculate DRAM power*/
@@ -190,13 +198,15 @@ class StatsManager
 		  double dimms_per_socket;
 	  } dram_cntlr_table = {500.0, 0.678, 0.825, 1.0, 8.0, 4.0};
 
+	  void checkDTM(const vector<double> cpu_temp, double dram_temp); 
+
 	  void setGlobalFrequency(UInt64 freq_in_mhz);
 	  void setFrequency(UInt64 core_num, UInt64 freq_in_mhz);
 
 	  double computeBankPower(double bnk_pre, double cke_lo_pre, double page_hit, double WRsch, double RDsch, bool hot, double Vdd_use);
 
 	  double computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, SubsecondTime tRD, SubsecondTime tWR, SubsecondTime totT, UInt32 reads, UInt32 writes, double page_hit_rate);
-	  double computeDramCntlrPower(UInt32 reads, UInt32 writes, SubsecondTime t);
+	  double computeDramCntlrPower(UInt32 reads, UInt32 writes, SubsecondTime t, UInt32 tot_access);
 
 
       // Use std::string here because String (__versa_string) does not provide a hash function for STL containers with gcc < 4.6

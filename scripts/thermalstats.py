@@ -80,6 +80,7 @@ class ThermalStats:
       #sim.stats.register_per_thread('L2-'+metric, 'L2', metric)
       sim.stats.register('processor', 0, metric, self.get_stat)
       sim.stats.register('dram', 0, metric, self.get_stat)
+      sim.stats.register('mc', 0, metric, self.get_stat)
 
   def periodic(self, time, time_delta):
     self.update()
@@ -129,7 +130,7 @@ class ThermalStats:
 
   def update_power(self, power):
     def get_power(component, prefix = ''):
-      return Power(component[prefix + 'Subthreshold Leakage'] + component[prefix + 'Gate Leakage'], component[prefix + 'Runtime Dynamic'])
+      return Power(component[prefix + 'Subthreshold Leakage'] + component[prefix + 'Gate Leakage'], component[prefix + 'Peak Dynamic'])
     for core in range(sim.config.ncores):
       self.power[('l1i', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/Instruction Cache/')
       self.power[('insdec', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/Instruction Decoder/')
@@ -148,6 +149,7 @@ class ThermalStats:
       self.power[('ifetch', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/')
     self.power[('processor', 0)] = get_power(power['Processor'])
     self.power[('dram', 0)] = get_power(power['DRAM'])
+    self.power[('mc', 0)] = get_power(power['Memory Controller'])
 #self.power[('L3', 0)] = get_power(power['L3'][0])
 
   def update_energy(self):

@@ -8,14 +8,14 @@
 #<Thickness in m>
 #<floorplan file>
 
-# Layer 0: Silicon
+# Layer 0: DRAM Layer 1
 0
 Y
 Y
 1.75e6
 0.01
 0.00015
-./HotSpot/core_layer.flr
+./HotSpot/dram_layer_1.flr
 
 # Layer 1
 1
@@ -26,14 +26,14 @@ N
 2.0e-05
 ./HotSpot/tsv_lv.flp
 
-# Layer 2: DRAM Layer 0
+# Layer 2: DRAM Layer 2
 2
 Y
 Y
 1.75e6
 0.01
 0.00015
-./HotSpot/dram_layer_0.flr
+./HotSpot/dram_layer_2.flr
 
 # Layer 3
 3
@@ -44,14 +44,14 @@ N
 2.0e-05
 ./HotSpot/tsv_lv.flp
 
-# Layer 4: DRAM Layer 1
+# Layer 4: DRAM Layer 3
 4
 Y
 Y
 1.75e6
 0.01
 0.00015
-./HotSpot/dram_layer_1.flr
+./HotSpot/dram_layer_3.flr
 
 # Layer 5
 5
@@ -62,14 +62,14 @@ N
 2.0e-05
 ./HotSpot/tsv_lv.flp
 
-# Layer 6: DRAM Layer 2
+# Layer 6: DRAM Layer 4
 6
 Y
 Y
 1.75e6
 0.01
 0.00015
-./HotSpot/dram_layer_2.flr
+./HotSpot/dram_layer_4.flr
 
 # Layer 7
 7
@@ -80,14 +80,14 @@ N
 2.0e-05
 ./HotSpot/tsv_lv.flp
 
-# Layer 8: DRAM Layer 3
+# Layer 8: DRAM Layer 0
 8
 Y
 Y
 1.75e6
 0.01
 0.00015
-./HotSpot/dram_layer_3.flr
+./HotSpot/dram_layer_0.flr
 
 # Layer 9
 9
@@ -98,12 +98,11 @@ N
 2.0e-05
 ./HotSpot/tsv_lv.flp
 
-# Layer 10: DRAM Layer 4
+# Layer 10: Silicon
 10
 Y
 Y
 1.75e6
 0.01
 0.00015
-./HotSpot/dram_layer_4.flr
-
+./HotSpot/core_layer.flr
