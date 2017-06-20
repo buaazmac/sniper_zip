@@ -1,6 +1,8 @@
 #ifndef __UTIL_H
 #define __UTIL_H
 
+#pragma GCC diagnostic ignored "-Wwrite-strings"
+
 #include <stdio.h>
 
 #define MAX(x,y)		(((x)>(y))?(x):(y))

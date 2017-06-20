@@ -78,8 +78,14 @@ public:
 		bool valid, just_remapped, last_remapped;
 	};
 	UInt32 n_vaults, n_banks, n_rows;
-	const UInt32 temperature_threshold = 85;
-	const UInt32 row_access_threshold = 10;
+	UInt32 temperature_threshold;
+
+	UInt32 max_remap_num;
+	UInt32 row_access_threshold;
+	bool cross_finding;
+	bool invalidate_row;
+	bool migrate_row;
+
 	const UInt32 bank_access_threshold = 1000;
 	const UInt32 vault_access_threshold = 3000;
 	UInt32 n_entries;
@@ -127,13 +133,14 @@ class RemappingManager {
 	void getPhysicalIndex(UInt32* v_i, UInt32* b_i); // return a physical global bank index, (useful for both remapping table structure)
 	*/
 public:
-	/* remapping policy: 
-						1. invalidation vault remapping
-						2. invalidation bank remapping
-						3. migration vault remapping
-						4. migration bank remapping
-	 */
-	UInt32 policy;
+	UInt32 max_remap_num;
+	UInt32 row_access_threshold;
+	bool cross_finding;
+	bool invalidate_row;
+	bool migrate_row;
+	bool do_mea;
+	UInt32 high_temp_thres, dangerous_temp_thres, remap_temp_thres;
+
 	UInt32 n_vaults, n_banks, n_rows;
 	UInt32 tot_access, hot_access, cool_access;
 	UInt32 tot_access_last, hot_access_last, cool_access_last, hits_on_hot, hits_on_cool, tot_remaps, cross_remaps, n_intervals;
@@ -148,8 +155,10 @@ public:
 
 	StackedDramPerfUnison* m_dram_perf_cntlr;
 
-	RemappingManager(StackedDramPerfUnison* dram_perf_cntlr, UInt32 p);
+	RemappingManager(StackedDramPerfUnison* dram_perf_cntlr);
 	~RemappingManager();
+
+	void setRemapConfig(UInt32 i_max_remaps, UInt32 i_access_threshold, bool i_cross, bool i_invalid, bool i_mig, UInt32 ht, UInt32 dt, UInt32 rt, bool i_mea);
 	
 	double getAverage(std::vector<UInt32> vec);
 
@@ -168,6 +177,7 @@ public:
 	bool checkVaultStat(UInt32 v, UInt32 b) {return false;};
 	bool checkStat(UInt32 v, UInt32 b, bool remap) {return false;};
 
+	bool checkBankHot(UInt32 v, UInt32 b);
 	void updateTemperature(UInt32 v, UInt32 b, UInt32 temp, UInt32 v_temp);
 
 	void reset(UInt32 v, UInt32 b, UInt32 r);

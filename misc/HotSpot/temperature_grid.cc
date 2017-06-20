@@ -1116,6 +1116,133 @@ void dump_steady_temp_grid (grid_model_t *model, char *file)
   /* top layer of the most-recently computed steady state temperature	*/
   dump_top_layer_temp_grid(model, file, model->last_steady);
 }
+/* dump temperature vector alloced using 'hotspot_vector' to 'file' */ 
+void dump_temp_trace_grid(grid_model_t *model, double *temp, char *file)
+{
+  int i, n, base = 0;
+  char str[STR_SIZE];
+  FILE *fp;
+
+  int extra_nodes;
+  int model_secondary = model->config.model_secondary;
+  int nl = model->n_layers;
+  int spidx, hsidx, silidx, intidx, c4idx, metalidx, subidx, solderidx, pcbidx;
+
+  if (model_secondary)
+    extra_nodes = EXTRA + EXTRA_SEC;
+  else
+    extra_nodes = EXTRA;
+
+  if (!strcasecmp(file, "stdout"))
+    fp = stdout;
+  else if (!strcasecmp(file, "stderr"))
+    fp = stderr;
+  else 	
+    fp = fopen (file, "w");
+
+  if (!fp) {
+      sprintf (str,"error: %s could not be opened for writing\n", file);
+      fatal(str);
+  }
+
+  spidx = nl - DEFAULT_PACK_LAYERS + LAYER_SP;
+  hsidx = nl - DEFAULT_PACK_LAYERS + LAYER_SINK;
+  if (model_secondary) {
+      subidx = LAYER_SUB;
+      solderidx = LAYER_SOLDER;
+      pcbidx = LAYER_PCB;	
+      if(!model->has_lcf){
+          silidx = SEC_PACK_LAYERS + SEC_CHIP_LAYERS + LAYER_SI;
+          intidx = SEC_PACK_LAYERS + SEC_CHIP_LAYERS + LAYER_INT;
+          c4idx  = SEC_PACK_LAYERS + LAYER_C4;
+          metalidx = SEC_PACK_LAYERS + LAYER_METAL;		
+      }
+  }
+  else{
+      silidx = LAYER_SI;
+      intidx = LAYER_INT;
+  }
+
+  /* layer temperatures	*/
+  for(n=0; n < model->n_layers; n++) {
+      if (!model_secondary) {
+          /* default set of layers	*/
+          if (!model->has_lcf) {
+              if(n == silidx)
+                strcpy(str,"");
+              else if(n == intidx)
+                strcpy(str,"iface_");
+              else if(n == spidx)
+                strcpy(str,"hsp_");
+              else if(n == hsidx)
+                strcpy(str,"hsink_");
+              else
+                fatal("unknown layer\n");
+          } else {
+              if (n == spidx)
+                strcpy(str, "hsp_");	/* spreader layer	*/
+              else if (n == hsidx)
+                strcpy(str, "hsink_");	/* heatsink layer	*/
+              else	/* other layers	*/
+                sprintf(str,"layer_%d_", n);
+          }
+      } else {
+          /* default set of layers	*/
+          if (!model->has_lcf) {
+              if(n == silidx)
+                strcpy(str,"");
+              else if(n == intidx)
+                strcpy(str,"iface_");
+              else if(n == spidx)
+                strcpy(str,"hsp_");
+              else if(n == hsidx)
+                strcpy(str,"hsink_");
+              else if(n == metalidx)
+                strcpy(str,"metal_");
+              else if(n == c4idx)
+                strcpy(str,"c4_");
+              else if(n == subidx)
+                strcpy(str,"sub_");
+              else if(n == solderidx)
+                strcpy(str,"solder_");
+              else if(n == pcbidx)
+                strcpy(str,"pcb_");
+              else
+                fatal("unknown layer\n");
+              /* layer configuration file	*/
+          } else {
+              if (n == spidx)
+                strcpy(str, "hsp_");	/* spreader layer	*/
+              else if (n == hsidx)
+                strcpy(str, "hsink_");	/* heatsink layer	*/
+              else if (n == subidx)
+                strcpy(str, "sub_");	/* package substrate layer	*/
+              else if (n == solderidx)
+                strcpy(str, "solder_");	/* solder layer	*/
+              else if (n == pcbidx)
+                strcpy(str, "pcb_");	/* pcb layer	*/
+              else	/* other layers	*/
+                sprintf(str,"layer_%d_", n);
+          }
+      }
+
+      for(i=0; i < model->layers[n].flp->n_units; i++)
+        fprintf(fp, "%s%s\t%.2f\n", str, 
+                model->layers[n].flp->units[i].name, temp[base+i]);
+      base += model->layers[n].flp->n_units;	
+  }
+
+  if (base != model->total_n_blocks)
+    fatal("total_n_blocks failed to tally\n");
+
+  /* internal node temperatures	*/
+  for (i=0; i < extra_nodes; i++) {
+      sprintf(str, "inode_%d", i);
+      fprintf(fp, "%s\t%.2f\n", str, temp[base+i]);
+  }
+  if(fp != stdout && fp != stderr)
+    fclose(fp);	
+}
 
 /* dump temperature vector alloced using 'hotspot_vector' to 'file' */ 
 void dump_temp_grid(grid_model_t *model, double *temp, char *file)

@@ -142,9 +142,14 @@ class StatsManager
 	  UInt32 vault_access[32];
 	  /* Write power of dram*/
 	  double bank_power[32][8];
+	  double prev_bank_temp[32][8];
 	  double vault_power[32];
 	  double power_L3, power_mc;
 	  double power_exe[4], power_ifetch[4], power_lsu[4], power_mmu[4], power_l2[4], power_ru[4], power_ialu[4], power_fpalu[4], power_inssch[4], power_l1i[4], power_insdec[4], power_bp[4], power_l1d[4];
+	  // Record the previous power value for each component
+	  double p_power_L3, p_power_mc;
+	  double p_power_exe[4], p_power_ifetch[4], p_power_lsu[4], p_power_mmu[4], p_power_l2[4], p_power_ru[4], p_power_ialu[4], p_power_fpalu[4], p_power_inssch[4], p_power_l1i[4], p_power_insdec[4], p_power_bp[4], p_power_l1d[4];
+
 	  int hot_access[32][8], cool_access[32][8], err_access[32][8];
 	  
 	  /*Temperature data*/
@@ -160,6 +165,7 @@ class StatsManager
 	  int ttrace_num;
 	  std::ofstream power_trace_log;
 	  std::ofstream temp_trace_log;
+	  bool dump_trace;
 	  void dumpDramPowerTrace();
 	  void updateBankStat(int i, int j, BankPerfModel* bank);
 	  /*Hotspot*/

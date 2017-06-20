@@ -433,6 +433,20 @@ TODO:
 	/* Place to call remapping manager (REMAP_MAN) */
 	SubsecondTime remap_delay = checkRemapping(pkt_time, perf);
 
+	/*
+	 * Here we can calculate the new target set here 
+	 * based on remapping structure
+	 * Information need to be stored in remapping structure
+	 */
+	UInt32 remap_set_n = set_n;
+	bool valid_remap_set = m_dram_perf_model->getRemapSet(set_n, &remap_set_n);
+	if (!valid_remap_set) {
+		model_delay += m_dram_bandwidth.getRoundedLatency(8 * 64);
+		model_delay += remap_delay;
+		std::cout << "[NEW_REMAP_DEBUG] here we skip a mem access because of heat!\n";
+		return model_delay;
+	}
+
 	/* Try to acccess cache set*/
 	UInt8 hit = m_set[set_n]->accessAttempt(mem_op_type, page_tag, page_offset);
 	cache_access ++;

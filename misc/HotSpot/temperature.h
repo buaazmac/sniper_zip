@@ -375,6 +375,7 @@ void trim_hotspot_vector(RC_model_t *model, double *dst, double *src,
 /* update the model's node count	*/						 
 void resize_thermal_model(RC_model_t *model, int n_units);						 
 void set_temp (RC_model_t *model, double *temp, double val);
+void dump_temp_trace (RC_model_t *model, double *temp, char *file);
 void dump_temp (RC_model_t *model, double *temp, char *file);
 void copy_temp (RC_model_t *model, double *dst, double *src);
 void read_temp (RC_model_t *model, double *temp, char *file, int clip);

@@ -82,10 +82,10 @@ StatsManager::~StatsManager()
    int tot_hot_access = 0, tot_cool_access = 0;
    for (int i = 0; i < 32; i++) {
 	   for (int j = 0; j < 8; j++) {
-		   std::cout << "/*BANK*/" << i << "->" << j
-					 << ": cool access (" << cool_access[i][j] << "), "
-					 << "hot access (" << hot_access[i][j] << "), " 
-					 << "error acces (" << err_access[i][j] << ")." << std::endl;
+		   //std::cout << "/*BANK*/" << i << "->" << j
+			//		 << ": cool access (" << cool_access[i][j] << "), "
+			//		 << "hot access (" << hot_access[i][j] << "), " 
+			//		 << "error acces (" << err_access[i][j] << ")." << std::endl;
 		   tot_hot_access += hot_access[i][j];
 		   tot_cool_access += cool_access[i][j];
 	   }
@@ -166,14 +166,20 @@ StatsManager::init()
    /*Initialize log file*/
    power_trace_log.open("power_trace_log.txt");
    temp_trace_log.open(ttrace_file);
+
+   /* Set whether to dump trace*/
+   dump_trace = Sim()->getCfg()->getBoolDefault("perf_model/thermal/dump_trace", false);
+
    ttrace_num = 0;
    /*Initial Hotspot*/
+   int hotspot_analysis_threshold = Sim()->getCfg()->getInt("perf_model/thermal/hotspot_analysis_threshold");
    hotspot = new Hotspot();
    unit_names = alloc_names(MAX_UNITS, STR_SIZE);
    unit_temp = dvector(MAX_UNITS);
    /*Get Unit names*/
    unit_num = 0;
    hotspot->getNames("./HotSpot/powertrace.input", unit_names, &unit_num);
+   hotspot->_start_analysis_threshold = double(hotspot_analysis_threshold);
    /*Initial DRAM bank statistics*/
    for (int i = 0; i < 32; i++) {
 	   vault_reads[i] = 0;
@@ -191,8 +197,31 @@ StatsManager::init()
 		   hot_access[i][j] = 0;
 		   cool_access[i][j] = 0;
 		   err_access[i][j] = 0;
+
+		   prev_bank_temp[i][j] = 0;
 	   }
    }
+   /*Initialize power values*/
+	for (int i = 0; i < 4; i++) {
+		power_ialu[i] = power_fpalu[i] = power_inssch[i] 
+					  = power_l1i[i] = power_insdec[i] 
+					  = power_bp[i] = power_ru[i] 
+					  = power_l1d[i] = power_mmu[i]
+					  = power_l2[i] = 0;
+		p_power_ialu[i] = p_power_fpalu[i] = p_power_inssch[i] 
+					  = p_power_l1i[i] = p_power_insdec[i] 
+					  = p_power_bp[i] = p_power_ru[i] 
+					  = p_power_l1d[i] = p_power_mmu[i]
+					  = p_power_l2[i] = 0;
+	}
+	for (int i = 0; i < 32; i++) {
+		vault_power[i] = 0;
+	}
+	for (int j = 0; j < 8; j++) {
+		for (int i =0; i < 32; i++) {
+			bank_power[i][j] = 0;
+		}
+	}
    /*Initialize current time*/
    m_current_time = SubsecondTime::Zero();
    m_last_remap_time = SubsecondTime::Zero();
@@ -209,10 +238,11 @@ StatsManager::init()
    reverse_flp = Sim()->getCfg()->getBoolDefault("perf_model/thermal/reverse", false);
 
    /* Initialization of frequency table for DVFS*/
-   freq_table.push_back(532);
-   freq_table.push_back(1064);
-   freq_table.push_back(1596);
-   freq_table.push_back(2128);
+   int num_freq = Sim()->getCfg()->getInt("perf_model/thermal/freq_num");
+   int freq_step = (2660 - 532) / (num_freq - 1);
+   for (int i = 0; i < num_freq - 1; i++) {
+	   freq_table.push_back(532 + freq_step * i);
+   }
    freq_table.push_back(2660);
    freq_lev = freq_table.size() - 1;
    max_lev = freq_table.size() - 1;
@@ -434,9 +464,7 @@ StatsManager::computeDramCntlrPower(UInt32 reads, UInt32 writes, SubsecondTime t
 	if (tot_access != 0)
 		ratio = double(reads + writes) / double(tot_access);
 	if (ratio > 1) ratio = 1;
-	double real_power = power_mc * 32 * ratio;
-	if (ratio == 0) 
-		real_power = power_mc;
+	double real_power = power_mc * ratio;
 	if (raw_power > real_power)
 		raw_power = real_power;
 	
@@ -592,30 +620,29 @@ StatsManager::updateBankStat(int i, int j, BankPerfModel* bank)
 void
 StatsManager::recordPowerTrace()
 {
-		/* Here we output power trace for drawing picture*/
-		for (int i = 0; i < 4; i++) {
-			power_trace_log << power_ialu[i] << "\t" << power_fpalu[i] 
-					<< "\t" << power_inssch[i] << "\t" << power_l1i[i]
-					<< "\t" << power_insdec[i] << "\t" << power_bp[i]
-					<< "\t" << power_ru[i] << "\t" << power_l1d[i]
-					<< "\t" << power_mmu[i] << "\t" << power_l2[i] << " | \t";
-		}
-		for (int i = 0; i < 32; i++) {
-			power_trace_log << vault_power[i] << "\t";
-		}
-		power_trace_log << " | ";
-		for (int j = 0; j < 8; j++) {
-			for (int i =0; i < 32; i++) {
-				power_trace_log << bank_power[i][j] << "\t";
-			}
-		}
-		power_trace_log << std::endl;
-		/**/
 }
 
 void
 StatsManager::updatePower()
 {
+	// Store the current power to previous array
+	p_power_mc = power_mc;
+	for (int i = 0; i < 4; i++) {
+		p_power_exe[i] = power_exe[i];
+		p_power_ifetch[i] = power_ifetch[i];
+		p_power_lsu[i] = power_lsu[i];
+		p_power_mmu[i] = power_mmu[i];
+		p_power_l2[i] = power_l2[i];
+		p_power_ru[i] = power_ru[i];
+		p_power_ialu[i] = power_ialu[i];
+		p_power_fpalu[i] = power_fpalu[i];
+		p_power_inssch[i] = power_inssch[i];
+		p_power_l1i[i] = power_l1i[i];
+		p_power_insdec[i] = power_insdec[i];
+		p_power_bp[i] = power_bp[i];
+		p_power_l1d[i] = power_l1d[i];
+	}
+
 	power_mc = double(getMetricObject("mc", 0, "power-dynamic")->recordMetric()) * 1.0e-6;
 	for (int i = 0; i < 4; i++) {
 		power_exe[i] = double(getMetricObject("exe", i, "power-dynamic")->recordMetric()) * 1.0e-6;
@@ -738,11 +765,8 @@ StatsManager::dumpHotspotInput()
 	 * init_file(tmp.steady) from last time
 	 * -p powertrace.input
 	 */
-
-/* Write down power trace*/
 	std::ofstream pt_file;
 	pt_file.open("./HotSpot/powertrace.input");
-	//pt_file << "L3";
 	for (int i = 0; i < 4; i++) {
 		pt_file << "ialu_" << i << "\t";
 		pt_file << "fpalu_" << i << "\t";
@@ -764,42 +788,53 @@ StatsManager::dumpHotspotInput()
 		}
 	}
 	pt_file << std::endl;
-	/* We first write down the last power trace*/
-	for (int pt = 0; pt < 1; pt ++) {
+	
+	bool record_power = Sim()->getCfg()->getBoolDefault("perf_model/thermal/record_power", false);
+
+	if (record_power) {
 		for (int i = 0; i < 4; i++) {
-			pt_file << power_ialu[i] << "\t" << power_fpalu[i] 
-					<< "\t" << power_inssch[i] << "\t" << power_l1i[i]
-					<< "\t" << power_insdec[i] << "\t" << power_bp[i]
-					<< "\t" << power_ru[i] << "\t" << power_l1d[i]
-					<< "\t" << power_mmu[i] << "\t" << power_l2[i] << "\t";
+			power_trace_log
+			<< power_ialu[i] << "\t" 
+			<< power_fpalu[i] << "\t" 
+			<< power_inssch[i] << "\t" 
+			<< power_l1i[i] << "\t" 
+			<< power_insdec[i] << "\t" 
+			<< power_bp[i] << "\t" 
+			<< power_ru[i] << "\t" 
+			<< power_l1d[i] << "\t" 
+			<< power_mmu[i] << "\t" 
+			<< power_l2[i] << "\t";
 		}
 		for (int i = 0; i < 32; i++) {
-			pt_file << vault_power[i] << "\t";
+			power_trace_log << vault_power[i] << "\t";
 		}
 		for (int j = 0; j < 8; j++) {
 			for (int i =0; i < 32; i++) {
-				pt_file << bank_power[i][j] << "\t";
+				power_trace_log << bank_power[i][j] << "\t";
 			}
 		}
-		pt_file << std::endl;
-		
-		/* DEBUG: Here Record Power Trace*/
-		recordPowerTrace();
+		power_trace_log << std::endl;
 	}
-
-
 	/* Here we update the power data*/
 	updatePower();
 
+	int pt_num = Sim()->getCfg()->getInt("perf_model/thermal/pt_num");
 	/* Here we output the second trace of HotSpot Input*/
-	for (int pt = 0; pt < 1; pt ++) {
-
+	for (int pt = 0; pt <= pt_num; pt ++) {
+		double p_ratio = double(pt) / double(pt_num);
+		p_ratio = 1;
 		for (int i = 0; i < 4; i++) {
-			pt_file << power_ialu[i] << "\t" << power_fpalu[i] 
-					<< "\t" << power_inssch[i] << "\t" << power_l1i[i]
-					<< "\t" << power_insdec[i] << "\t" << power_bp[i]
-					<< "\t" << power_ru[i] << "\t" << power_l1d[i]
-					<< "\t" << power_mmu[i] << "\t" << power_l2[i] << "\t";
+			pt_file 
+			<< p_power_ialu[i] + p_ratio * (power_ialu[i] - p_power_ialu[i]) << "\t" 
+			<< p_power_fpalu[i] + p_ratio * (power_fpalu[i] - p_power_fpalu[i]) << "\t" 
+			<< p_power_inssch[i] + p_ratio * (power_inssch[i] - p_power_inssch[i]) << "\t" 
+			<< p_power_l1i[i] + p_ratio * (power_inssch[i] - p_power_inssch[i]) << "\t" 
+			<< p_power_insdec[i] + p_ratio * (power_insdec[i] - p_power_insdec[i]) << "\t" 
+			<< p_power_bp[i] + p_ratio * (power_bp[i] - p_power_bp[i]) << "\t" 
+			<< p_power_ru[i] + p_ratio * (power_ru[i] - p_power_ru[i]) << "\t" 
+			<< p_power_l1d[i] + p_ratio * (power_l1d[i] - p_power_l1d[i]) << "\t" 
+			<< p_power_mmu[i] + p_ratio * (power_mmu[i] - p_power_mmu[i]) << "\t" 
+			<< p_power_l2[i] + p_ratio * (power_l2[i] - p_power_l2[i]) << "\t";
 		}
 		for (int i = 0; i < 32; i++) {
 			pt_file << vault_power[i] << "\t";
@@ -913,7 +948,7 @@ StatsManager::callHotSpot()
 		argv[1] = "-c";
 		argv[2] = "./HotSpot/hotspot.config";
 		argv[3] = "-steady_file";
-		argv[4] = "./HotSpot/tmp.steady";
+		argv[4] = "./HotSpot/init.steady";
 		argv[5] = "-f";
 		argv[6] = "./HotSpot/core_layer.flr";
 		argv[7] = "-p";
@@ -922,30 +957,43 @@ StatsManager::callHotSpot()
 		argv[10] = "grid";
 		argv[11] = "-grid_layer_file";
 		argv[12] = "./HotSpot/test_3D.lcf";
+		argv[13] = "-init_file";
+		argv[14] = "./HotSpot/init.steady";
 
 		if (reverse_flp) {
 			argv[12] = "./HotSpot/reverse_3D.lcf";
 		}
+		hotspot->initHotSpot(15, argv);
+		//hotspot->startWarmUp();
+		//hotspot->calculateTemperature(unit_temp);
+		//hotspot->endHotSpot();
 
-		hotspot->calculateTemperature(unit_temp, 13, argv);
-	} else {
+		//hotspot->calculateTemperature(unit_temp, 13, argv);
+	} 
+	/*
+	else {
 		int rename_rst;
-		char old_name[] = "./HotSpot/tmp.steady.new";
-		char new_name[] = "./HotSpot/tmp.steady";
-		rename_rst = rename(old_name, new_name);
-		if (rename_rst == 0) {
-			//std::cout << "[Steady File Rename] Success!\n";
-		} else {
-			//std::cout << "[Steady File Rename] Failed!\n";
+		char old_name[] = "./HotSpot/last.steady";
+		char new_name[] = "./HotSpot/init.steady";
+		if (hotspot->do_transient == TRUE || hotspot->start_analysis == TRUE) {
+			std::cout << "[Steady File Rename] Rename init file!\n";
+			rename_rst = rename(old_name, new_name);
+			if (rename_rst == 0) {
+				//std::cout << "[Steady File Rename] Success!\n";
+			} else {
+				std::cout << "[Steady File Rename] Failed!\n";
+			}
 		}
 	}
+	*/
+	//hotspot->calculateTemperature(unit_temp);
 
-	//std::cout << "[STAT_DEBUG] End first  Calling HotSpot" << std::endl;
+
 	/*Second run to get final output*/
 	argv[1] = "-c";
 	argv[2] = "./HotSpot/hotspot.config";
   	argv[3] = "-init_file";
-  	argv[4] = "./HotSpot/tmp.steady";
+  	argv[4] = "./HotSpot/init.steady";
   	argv[5] = "-f";
   	argv[6] = "./HotSpot/core_layer.flr";
   	argv[7] = "-p";
@@ -957,13 +1005,17 @@ StatsManager::callHotSpot()
   	argv[13] = "-grid_layer_file";
   	argv[14] = "./HotSpot/test_3D.lcf";
 	argv[15] = "-steady_file";
-	argv[16] = "./HotSpot/tmp.steady.new";
+	argv[16] = "./HotSpot/last.steady";
+
 
 
 	if (reverse_flp)
 		argv[14] = "./HotSpot/reverse_3D.lcf";
 
-	hotspot->calculateTemperature(unit_temp, 17, argv);
+	//hotspot->initHotSpot(17, argv);
+	hotspot->calculateTemperature(unit_temp);
+	//hotspot->endHotSpot();
+	//hotspot->calculateTemperature(unit_temp, 17, argv);
 
 	//std::cout << "[STAT_DEBUG] End second Calling HotSpot" << std::endl;
 	/*Debug for temperature*/
@@ -973,13 +1025,17 @@ StatsManager::callHotSpot()
 	vector<double> core_max_temp(4, 0.0);
 	max_temp = max_cntlr_temp = max_bank_temp = avg_temp_cpu = avg_temp_dram = 0;
 
-	temp_trace_log << "-------trace_" << ttrace_num << "-----"  
-				   << "current_interval: " << m_record_interval.getUS() << std::endl;
+	if (dump_trace)
+		temp_trace_log << "-------trace_" << ttrace_num << "-----"  
+					   << "current_interval: " << m_record_interval.getUS() 
+					   << std::endl;
 
 	ttrace_num ++;
 
 	for (int i = 0; i < unit_num; i++) {
-		temp_trace_log << "[Sniper] UnitName: " << unit_names[i] << ", UnitTemp: " << unit_temp[i];
+		if (dump_trace)
+			temp_trace_log << "[Sniper] UnitName: " << unit_names[i] 
+						   << ", UnitTemp: " << unit_temp[i];
 		if (unit_temp[i] > max_temp) max_temp = unit_temp[i];
 		if (i < 40) {
 			avg_temp_cpu += unit_temp[i];
@@ -990,15 +1046,20 @@ StatsManager::callHotSpot()
 		}
 		if (i >= 40 && i < 72) {
 			avg_temp_dram += unit_temp[i];
-			temp_trace_log << ", Cntlr_" << i - 40 
-				<< " Power: " << vault_power[i-40] << ", Total Access: " << vault_access[i-40]; 
+			if (dump_trace)
+				temp_trace_log << ", Cntlr_" << i - 40 
+							   << " Power: " << vault_power[i-40] 
+							   << ", Total Access: " << vault_access[i-40]; 
 			if (unit_temp[i] > max_cntlr_temp) max_cntlr_temp = unit_temp[i];
 		}
 		if (i >= 72) {
 			int v_i = (i - 72) % 32, b_i = (i - 72) / 32;
 			BankStatEntry *tmp = &bank_stats_interval[v_i][b_i];
 			/* Here we log temperature and access of banks*/
-			temp_trace_log << ", Bank Power: " << bank_power[v_i][b_i] << ", Total Access: " << tmp->reads + tmp->writes;
+			if (dump_trace)
+				temp_trace_log << ", Bank Power: " << bank_power[v_i][b_i] 
+					           << ", Total Access: " << tmp->reads + tmp->writes;
+
 			if (unit_temp[i] > max_bank_temp) max_bank_temp = unit_temp[i];
 
 			/* (REMAP_MAN) Here We Want to Update Temperature 
@@ -1008,17 +1069,19 @@ StatsManager::callHotSpot()
 			int vault_temp = int(unit_temp[40 + v_i]),
 				bank_temp = int(unit_temp[i]);
 			m_stacked_dram_unison->updateTemperature(v_i, b_i, bank_temp, vault_temp);
-			if (unit_temp[i] > 85) {
+			if (prev_bank_temp[v_i][b_i] > 85) {
 				hot_access[v_i][b_i] += tmp->reads + tmp->writes;
-				if (unit_temp[i] > 95) {
+				if (prev_bank_temp[v_i][b_i] > 95) {
 					err_access[v_i][b_i] += tmp->reads + tmp->writes;
 				}
 			} else {
 				if (m_stacked_dram_unison->enter_roi)
 					cool_access[v_i][b_i] += tmp->reads + tmp->writes;
 			}
+			prev_bank_temp[v_i][b_i] = unit_temp[i];
 		}
-		temp_trace_log << std::endl;
+		if (dump_trace)
+			temp_trace_log << std::endl;
 	}
 
 	/* Here we choose what to do with DVFS */

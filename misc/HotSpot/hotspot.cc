@@ -267,6 +267,7 @@ Hotspot::Hotspot()
 
 Hotspot::~Hotspot()
 {
+	endHotSpot();
 }
 
 void
@@ -313,60 +314,22 @@ Hotspot::getNames(const char *file, char **names, int *len)
 void 
 Hotspot::initHotSpot(int argc, char **argv)
 {
-  printf("*[Hotspot] begins initialization!\n");
+  int i;
+  printf("*[Hotspot] begin initialization!\n");
 
-  printf("*[Hotspot] ends initialization!\n");
-}
-
-/*
- * implementation of calculateTemperature
- */
-void
-Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
-{
-	//printf("*[HotSpot] Here we begin calculate\n");
-  int i, j, idx, base = 0, count = 0, n = 0;
-  int num, size, lines = 0, do_transient = TRUE;
-  char **names;
-  double *vals;
-  /* trace file pointers	*/
-  FILE *pin, *tout = NULL;
-  /* floorplan	*/
-  flp_t *flp;
-  /* hotspot temperature model	*/
-  RC_model_t *model;
-  /* instantaneous temperature and power values	*/
-  double *temp = NULL, *power;
-  double total_power = 0.0;
-
-  /* steady state temperature and power values	*/
-  double *overall_power, *steady_temp;
-  /* thermal model configuration parameters	*/
-  thermal_config_t thermal_config;
-  /* global configuration parameters	*/
-  global_config_t global_config;
-  /* table to hold options and configuration */
-  str_pair table[MAX_ENTRIES];
-
-  /* variables for natural convection iterations */
-  int natural = 0; 
-  double avg_sink_temp = 0;
-  int natural_convergence = 0;
-  double r_convec_old;
-
-  /*BU_3D: variable for heterogenous R-C model */
-  int do_detailed_3D = FALSE; //BU_3D: do_detailed_3D, false by default
-  if (!(argc >= 5 && argc % 2)) {
-      usage(argc, argv);
-      return;
-  }
+  n = 0; do_transient = TRUE; do_temp_init = TRUE;
+  //first_call = TRUE;
+  do_detailed_3D = FALSE;
+  
 
   size = parse_cmdline(table, MAX_ENTRIES, argc, argv);
   global_config_from_strs(&global_config, table, size);
 
   /* no transient simulation, only steady state	*/
+  /*
   if(!strcmp(global_config.t_outfile, NULLFILE))
     do_transient = FALSE;
+	*/
 
   /* read configuration file	*/
   if (strcmp(global_config.config, NULLFILE))
@@ -390,24 +353,6 @@ Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
   /* modify according to command line / config file	*/
   thermal_config_add_from_strs(&thermal_config, table, size);
 
-  /* if package model is used, run package model */
-  if (((idx = get_str_index(table, size, "package_model_used")) >= 0) && !(table[idx].value==0)) {
-      if (thermal_config.package_model_used) {
-          avg_sink_temp = thermal_config.ambient + SMALL_FOR_CONVEC;
-          natural = package_model(&thermal_config, table, size, avg_sink_temp);
-          if (thermal_config.r_convec<R_CONVEC_LOW || thermal_config.r_convec>R_CONVEC_HIGH)
-            printf("Warning: Heatsink convection resistance is not realistic, double-check your package settings...\n"); 
-      }
-  }
-
-  /* dump configuration if specified	*/
-  if (strcmp(global_config.dump_config, NULLFILE)) {
-      size = global_config_to_strs(&global_config, table, MAX_ENTRIES);
-      size += thermal_config_to_strs(&thermal_config, &table[size], MAX_ENTRIES-size);
-      /* prefix the name of the variable with a '-'	*/
-      dump_str_pairs(table, size, global_config.dump_config, "-");
-  }
-
   /* initialization: the flp_file global configuration 
    * parameter is overridden by the layer configuration 
    * file in the grid model when the latter is specified.
@@ -424,32 +369,9 @@ Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
 
   populate_R_model(model, flp);
 
-  if (do_transient)
-    populate_C_model(model, flp);
+  populate_C_model(model, flp);
 
-#if VERBOSE > 2
-  debug_print_model(model);
-#endif
-
-  /* allocate the temp and power arrays	*/
-  /* using hotspot_vector to internally allocate any extra nodes needed	*/
-  if (do_transient)
-    temp = hotspot_vector(model);
-  power = hotspot_vector(model);
-  steady_temp = hotspot_vector(model);
-  overall_power = hotspot_vector(model);
-
-	//printf("*[HotSpot] Here we finish configuration\n");
-
-  /* set up initial instantaneous temperatures */
-  if (do_transient && strcmp(model->config->init_file, NULLFILE)) {
-      if (!model->config->dtm_used)	/* initial T = steady T for no DTM	*/
-        read_temp(model, temp, model->config->init_file, FALSE);
-      else	/* initial T = clipped steady T with DTM	*/
-        read_temp(model, temp, model->config->init_file, TRUE);
-  } else if (do_transient)	/* no input file - use init_temp as the common temperature	*/
-    set_temp(model, temp, model->config->init_temp);
-
+  init_temp = hotspot_vector(model);
   /* n is the number of functional blocks in the block model
    * while it is the sum total of the number of functional blocks
    * of all the floorplans in the power dissipating layers of the 
@@ -464,25 +386,117 @@ Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
   } else 
     fatal("unknown model type\n");
 
+  /* read init file */
+  if (do_transient && strcmp(model->config->init_file, NULLFILE)) {
+      if (!model->config->dtm_used)	
+        read_temp(model, init_temp, model->config->init_file, FALSE);
+      else	
+        read_temp(model, init_temp, model->config->init_file, TRUE);
+  } else if (do_transient)	
+    set_temp(model, init_temp, model->config->init_temp);
+
+  //printf("*[Hotspot] end initialization!\n");
+}
+
+/*
+ * implementation of calculateTemperature
+ */
+void
+Hotspot::calculateTemperature(double *temp_rst)
+{
+	//printf("*[HotSpot] Here we begin calculate\n");
+  int i, j, idx, base = 0, count = 0;
+
+  char **names;
+
+  double *vals;
+  /* instantaneous temperature and power values	*/
+  double *temp = NULL, *power;
+  double total_power = 0.0;
+
+  /* steady state temperature and power values	*/
+  double *overall_power, *steady_temp;
+
+  /* variables for natural convection iterations */
+  int natural = 0; 
+  double avg_sink_temp = 0;
+  int natural_convergence = 0;
+  double r_convec_old;
+
+  /* trace file pointers	*/
+  FILE *pin, *tout = NULL;
+
+  lines = 0;
+
+  /* if package model is used, run package model */
+  if (((idx = get_str_index(table, size, "package_model_used")) >= 0) && !(table[idx].value==0)) {
+      if (thermal_config.package_model_used) {
+          avg_sink_temp = thermal_config.ambient + SMALL_FOR_CONVEC;
+          natural = package_model(&thermal_config, table, size, avg_sink_temp);
+          if (thermal_config.r_convec<R_CONVEC_LOW || thermal_config.r_convec>R_CONVEC_HIGH)
+            printf("Warning: Heatsink convection resistance is not realistic, double-check your package settings...\n"); 
+      }
+  }
+
+  /* allocate the temp and power arrays	*/
+  /* using hotspot_vector to internally allocate any extra nodes needed	*/
+  temp = hotspot_vector(model);
+  power = hotspot_vector(model);
+  steady_temp = hotspot_vector(model);
+  overall_power = hotspot_vector(model);
+
+	//printf("*[HotSpot] Here we finish configuration\n");
+
+  /* set up initial instantaneous temperatures */
+  
+  /*
+  if (first_call == TRUE) {
+	first_call = FALSE;
+    set_temp(model, temp, model->config->init_temp);
+	printf("Set default initial temperature\n");
+  } else {
+    if (do_transient && !start_analysis) {
+	  printf("Set last temperature as initial temperature\n");
+	  copy_temp(model, temp, init_temp);
+    } else {
+	  printf("Set last steady temperature file as initial temperature\n");
+	  if (!model->config->dtm_used)	
+	    read_temp(model, temp, model->config->init_file, FALSE);
+	  else	
+	    read_temp(model, temp, model->config->init_file, TRUE);
+	  start_analysis = FALSE;
+    }
+  }
+  */
+  /* Set init temperature without init file*/
+  copy_temp(model, temp, init_temp);
+
+
   if(!(pin = fopen(global_config.p_infile, "r")))
     fatal("unable to open power trace input file\n");
+  /*(
   if(do_transient && !(tout = fopen(global_config.t_outfile, "w")))
     fatal("unable to open temperature trace file for output\n");
+	*/
 
-  /* names of functional units	*/
   names = alloc_names(MAX_UNITS, STR_SIZE);
   if(read_names(pin, names) != n)
     fatal("no. of units in floorplan and trace file differ\n");
 
-  /* header line of temperature trace	*/
+  /*
   if (do_transient)
     write_names(tout, names, n);
+  if (do_transient)
+    write_vals(tout, temp, n);
+	*/
 
   /* read the instantaneous power trace	*/
   vals = dvector(MAX_UNITS);
   while ((num=read_vals(pin, vals)) != 0) {
-      if(num != n)
+      if(num != n) {
+		//printf("%d:%d\n", num, n);
         fatal("invalid trace file format\n");
+	  }
 
       /* permute the power numbers according to the floorplan order	*/
       if (model->type == BLOCK_MODEL)
@@ -492,6 +506,7 @@ Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
         for(i=0, base=0, count=0; i < model->grid->n_layers; i++) {
             if(model->grid->layers[i].has_power) {
                 for(j=0; j < model->grid->layers[i].flp->n_units; j++) {
+					//printf("%f\n", power[base+idx]);
                     idx = get_blk_index(model->grid->layers[i].flp, names[count+j]);
                     power[base+idx] = vals[count+j];
                 }
@@ -505,6 +520,9 @@ Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
           /* if natural convection is considered, update transient convection resistance first */
           if (natural) {
               avg_sink_temp = calc_sink_temp(model, temp);
+
+			  //printf("avg_sink_temp: %.3f\n", avg_sink_temp);
+
               natural = package_model(model->config, table, size, avg_sink_temp);
               populate_R_model(model, flp);
           }
@@ -514,6 +532,7 @@ Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
            * this is used to maintain the internal grid temperatures 
            * across multiple calls of compute_temp
            */
+		  //printf("compute some tempratures\n");
           if (model->type == BLOCK_MODEL || lines == 0)
             compute_temp(model, power, temp, model->config->sampling_intvl);
           else
@@ -538,7 +557,7 @@ Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
             }
 
           /* output instantaneous temperature trace	*/
-          write_vals(tout, vals, n);
+          //write_vals(tout, vals, n);
       }		
 
       /* for computing average	*/
@@ -594,42 +613,64 @@ Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
     /* steady state temperature	*/
     steady_state_temp(model, overall_power, steady_temp);
 
+  /* for computing max temp */
+  /*
+  double steady_max = 0;
+  if (model->type == BLOCK_MODEL)
+    for(i=0; i < n; i++) {
+		if (steady_temp[i] > steady_max)
+			steady_max = steady_temp[i];
+    }
+  else
+    for(i=0, base=0; i < model->grid->n_layers; i++) {
+        if(model->grid->layers[i].has_power)
+          for(j=0; j < model->grid->layers[i].flp->n_units; j++) {
+			  if (steady_temp[base+j] > steady_max)
+				  steady_max = steady_temp[base+j];
+          }
+        base += model->grid->layers[i].flp->n_units;	
+    }
+	*/
+
   /* print steady state results	*/
   /* dump steady state temperatures on to file if needed	*/
-  if (strcmp(model->config->steady_file, NULLFILE))
-    dump_temp(model, steady_temp, model->config->steady_file);
-
-  /* for the grid model, optionally dump the most recent 
-   * steady state temperatures of the grid cells	
-   */
-  if (model->type == GRID_MODEL &&
-      strcmp(model->config->grid_steady_file, NULLFILE))
-    dump_steady_temp_grid(model->grid, model->config->grid_steady_file);
+  if (strcmp(model->config->steady_file, NULLFILE)) {
+	//printf("dump steady temperature to file: %s!\n", model->config->steady_file);
+	dump_temp(model, steady_temp, model->config->steady_file);
+	/* End Warm Up*/
+	//if (steady_max > _start_analysis_threshold + 273.15)
+	 // startAnalysis();
+  }
 
   /* Get steady temperature for Sniper*/
   if (model->type == BLOCK_MODEL) {
     for(i=0; i < n; i++)
       temp_rst[i] = vals[i] - 273.15;
+      //temp_rst[i] = steady_temp[i] - 273.15;
   } else {
     for(i=0, count=0; i < model->grid->n_layers; i++) {
         if(model->grid->layers[i].has_power) {
             for(j=0; j < model->grid->layers[i].flp->n_units; j++) {
-                temp_rst[count+j] = vals[count+j] - 273.15;
+				if (do_transient) {
+					temp_rst[count+j] = vals[count+j] - 273.15;
+				} 
             }
             count += model->grid->layers[i].flp->n_units;
         }	
     }
   }
-	//printf("*[HotSpot] Here we end calculate\n");
+  //printf("*[HotSpot] Here we end calculate\n");
+  
+  copy_temp(model, init_temp, temp);
+  model->grid->last_temp = init_temp;
 
   /* cleanup	*/
   fclose(pin);
+  /*
   if (do_transient)
     fclose(tout);
-  delete_RC_model(model);
-  free_flp(flp, FALSE);
-  if (do_transient)
-    free_dvector(temp);
+	*/
+  free_dvector(temp);
   free_dvector(power);
   free_dvector(steady_temp);
   free_dvector(overall_power);
@@ -641,8 +682,24 @@ Hotspot::calculateTemperature(double *temp_rst, int argc, char **argv)
 void
 Hotspot::endHotSpot()
 {
+  delete_RC_model(model);
+  free_flp(flp, FALSE);
+  free_dvector(init_temp);
 }
 
+void
+Hotspot::startAnalysis()
+{
+  do_transient = TRUE;
+  start_analysis = TRUE;
+}
+
+void
+Hotspot::startWarmUp()
+{
+  do_transient = FALSE;
+  start_analysis = FALSE;
+}
 
 /* 
  * main function - reads instantaneous power values (in W) from a trace

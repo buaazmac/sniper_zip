@@ -130,7 +130,8 @@ class ThermalStats:
 
   def update_power(self, power):
     def get_power(component, prefix = ''):
-      return Power(component[prefix + 'Subthreshold Leakage'] + component[prefix + 'Gate Leakage'], component[prefix + 'Peak Dynamic'])
+      return (Power(component[prefix + 'Subthreshold Leakage'] + component[prefix + 'Gate Leakage'], component[prefix + 'Peak Dynamic']))
+
     for core in range(sim.config.ncores):
       self.power[('l1i', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/Instruction Cache/')
       self.power[('insdec', core)] = get_power(power['Core'][core], 'Instruction Fetch Unit/Instruction Decoder/')
@@ -157,7 +158,7 @@ class ThermalStats:
       time_delta = sim.stats.time() - self.time_last_energy
       for (component, core), power in self.power.items():
         self.energy[(component, core, 'power-static')] = long(power.s * 1000000)
-        self.energy[(component, core, 'power-dynamic')] = long(power.d * 1000000)
+        self.energy[(component, core, 'power-dynamic')] = long((power.d + power.s) * 1000000)
 #self.energy[(component, core, 'energy-static')] = self.energy.get((component, core, 'energy-static'), 0) + long(time_delta * power.s)
 #self.energy[(component, core, 'energy-dynamic')] = self.energy.get((component, core, 'energy-dynamic'), 0) + long(time_delta * power.d)
       self.time_last_energy = sim.stats.time()

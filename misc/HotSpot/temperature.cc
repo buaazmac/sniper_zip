@@ -761,6 +761,16 @@ void set_temp(RC_model_t *model, double *temp, double val)
 }
 
 /* dump temperature vector alloced using 'hotspot_vector' to 'file' */ 
+void dump_temp_trace(RC_model_t *model, double *temp, char *file)
+{
+	if (model->type == BLOCK_MODEL)
+		dump_temp_block(model->block, temp, file);
+	else if (model->type == GRID_MODEL)	
+		dump_temp_trace_grid(model->grid, temp, file);
+	else fatal("unknown model type\n");	
+}
+
+/* dump temperature vector alloced using 'hotspot_vector' to 'file' */ 
 void dump_temp(RC_model_t *model, double *temp, char *file)
 {
 	if (model->type == BLOCK_MODEL)

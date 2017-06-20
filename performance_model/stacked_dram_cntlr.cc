@@ -96,14 +96,6 @@ StackedDramPerfMem::getAccessLatency(
 
 	SubsecondTime process_time = SubsecondTime::Zero();
 
-	//debug
-#ifdef LOG_OUTPUT
-	log_file  << "address: " << address
-			  << ", vault_i: " << v_i 
-			  << ", bank_i: " << bank_i 
-			  << ", row_i: " << row_i << std::endl;
-#endif
-	
 	process_time += vault->processRequest(pkt_time, access_type, bank_i, row_i);
 
 	return process_time;
@@ -142,13 +134,20 @@ StackedDramPerfUnison::StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_siz
 	bool c_cross = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/cross", true);
 	bool c_invalid = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/invalidation", true);
 	bool c_mig = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/migration", false);
+	bool c_mea = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/mea", false);
+	UInt32 high_temp_thres = Sim()->getCfg()->getInt("perf_model/remap_config/high_temp_thres");
+	UInt32 dangerous_temp_thres = Sim()->getCfg()->getInt("perf_model/remap_config/dangerous_temp_thres");
+	UInt32 remap_temp_thres = Sim()->getCfg()->getInt("perf_model/remap_config/remap_temp_thres");
 	enable_remap = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/remap", false);
-	m_remap_manager->setRemapConfig(c_max_remap_num, c_row_access_threshold, c_cross, c_invalid, c_mig);
+	reactive = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/reactive", false);
+	predictive = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/predictive", false);
+	no_hot_access = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/no_hot_access", false);
+	m_remap_manager->setRemapConfig(c_max_remap_num, c_row_access_threshold, c_cross, c_invalid, c_mig, high_temp_thres, dangerous_temp_thres, remap_temp_thres, c_mea);
 
 
 	remapped = false;
 	enter_roi = false;
-	bank_level_remap = Sim()->getCfg()->getBoolDefault("perf_model/thermal/bank_level_remap", false);
+	bank_level_refresh = Sim()->getCfg()->getBoolDefault("perf_model/thermal/bank_level_refresh", false);
 
 	v_remap_times = b_remap_times = 0;
 
@@ -174,6 +173,29 @@ StackedDramPerfUnison::~StackedDramPerfUnison()
 	//delete m_vremap_table;
 	delete m_dram_model;
 	delete m_remap_manager;
+}
+
+bool
+StackedDramPerfUnison::getRemapSet(UInt32 set_i, UInt32* remap_set)
+{
+	UInt32 vault_i = 0, bank_i = 0, row_i = 0;
+	splitSetNum(set_i, &vault_i, &bank_i, &row_i);
+	UInt32 ss = getSetNum(vault_i, bank_i, row_i);
+	if (ss != set_i) {
+		std::cout << "[ERROR] HooHoo, there is a problem with set number!\n";
+	}
+	UInt32 remap_vault = vault_i, remap_bank = bank_i, remap_row = row_i;
+	bool valid_bit = m_remap_manager->getPhysicalIndex(&remap_vault, &remap_bank, &remap_row);
+	bool orig_is_hot = m_remap_manager->checkBankHot(vault_i, bank_i);
+	bool remap_is_hot = m_remap_manager->checkBankHot(remap_vault, remap_bank);
+	*remap_set = getSetNum(remap_vault, remap_bank, remap_row);
+	if (!remap_is_hot)
+		return true;
+	if (!orig_is_hot || !no_hot_access) {
+		*remap_set = set_i;
+		return true;
+	}
+	return false;
 }
 
 void 
@@ -202,6 +224,7 @@ StackedDramPerfUnison::splitSetNum(UInt32 set_i, UInt32* vault_i, UInt32* bank_i
 	}
 
 }
+
 UInt32 
 StackedDramPerfUnison::getSetNum(UInt32 vault_i, UInt32 bank_i, UInt32 row_i)
 {
@@ -392,6 +415,7 @@ void
 StackedDramPerfUnison::tryRemapping()
 {
 	UInt32 remap_times = m_remap_manager->tryRemapping(enable_remap);
+	std::cout << "[RemappingAgain!] here we have " << remap_times << " remaps!\n";
 	remapped = true;
 }
 
@@ -463,8 +487,6 @@ StackedDramPerfUnison::updateStats()
 	*/
 	//m_remap_manager->resetRemapping();
 
-	log_file << " Updating Statistics for Vaults/Banks" << std::endl;
-
 	for (UInt32 i = 0; i < n_vaults; i++) {
 		VaultPerfModel* vault = m_vaults_array[i];
 	//	vault->stats.reads = m_dram_model->getVaultRdReq(i);
@@ -477,14 +499,6 @@ StackedDramPerfUnison::updateStats()
 
 		UInt32 serv_rd = m_dram_model->getServingRdReq(i);
 		UInt32 serv_wr = m_dram_model->getServingWrReq(i);
-
-		log_file << "Vault_" << i << ": "
-				 << vault->stats.reads << " "
-				 << vault->stats.writes << " "
-				 << vault->stats.row_hits << " "
-				 << vault->stats.que_len << " "
-				 << serv_rd << " "
-				 << serv_wr << std::endl;
 
 		tot_dram_reads += vault->stats.reads;
 		tot_dram_writes += vault->stats.writes;
@@ -525,19 +539,20 @@ StackedDramPerfUnison::clearCacheStats()
 void
 StackedDramPerfUnison::updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp)
 {
+	UInt32 high_temp_thres = Sim()->getCfg()->getInt("perf_model/remap_config/high_temp_thres");
 	if (Sim()->getMagicServer()->inROI()) {
 		enter_roi = true;
 	}
 	m_remap_manager->updateTemperature(v, b, temperature, v_temp);
-	if (temperature >= 85) {
+	if (temperature >= high_temp_thres) {
 		m_vaults_array[v]->m_banks_array[b]->stats.hot = true;
-		if (bank_level_remap)
+		if (bank_level_refresh)
 			m_dram_model->setBankRef(v, b, true);
 		
 		//std::cout << " Set Higher Ref Freq in bank " << v << " " << b << std::endl;
 	} else {
 		m_vaults_array[v]->m_banks_array[b]->stats.hot = false;
-		if (bank_level_remap)
+		if (bank_level_refresh)
 			m_dram_model->setBankRef(v, b, false);
 	}
 }
@@ -621,13 +636,6 @@ StackedDramPerfAlloy::getAccessLatency(
 	UInt32 vault_bit = floorLog2(n_vaults);
 	UInt32 bank_bit = floorLog2(m_vault_size / m_bank_size);
 	UInt32 row_bit = floorLog2(m_bank_size / m_row_size);
-
-#ifdef LOG_OUTPUT
-	log_file << "m_vault_size: " << m_vault_size
-			 << "m_bank_size: " << m_bank_size
-			  << ", bank_bit: " << bank_bit 
-			  << ", row_bit: " << row_bit << std::endl;
-#endif
 
 	UInt32 vault_i = (set_i >> row_bit) & ((1UL << vault_bit) - 1);
 	UInt32 bank_i = set_i >> row_bit >> vault_bit; 

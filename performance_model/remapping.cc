@@ -311,9 +311,8 @@ StatStoreUnit::isVaultTooFreq(UInt32 vault_i)
 
 //----------------------------------------------------
 
-RemappingManager::RemappingManager(StackedDramPerfUnison* dram_perf_cntlr, UInt32 p)
-	: m_dram_perf_cntlr(dram_perf_cntlr),
-	  policy(p)
+RemappingManager::RemappingManager(StackedDramPerfUnison* dram_perf_cntlr)
+	: m_dram_perf_cntlr(dram_perf_cntlr)
 {
 	n_vaults = dram_perf_cntlr->n_vaults;
 	n_banks = dram_perf_cntlr->n_banks;
@@ -328,6 +327,14 @@ RemappingManager::RemappingManager(StackedDramPerfUnison* dram_perf_cntlr, UInt3
 	tot_remaps = 0;
 	cross_remaps = 0;
 	n_intervals = 0;
+	
+	// EXP_SET
+	// Default values (old version): inflexible
+	max_remap_num = 5;
+	row_access_threshold = 20;
+	cross_finding = false;
+	invalidate_row = false;
+	migrate_row = false;
 
 	mea_map.clear();
 	hot_access_vec.clear();
@@ -369,6 +376,21 @@ RemappingManager::~RemappingManager()
 	delete m_stat_unit;
 }
 
+void
+RemappingManager::setRemapConfig(UInt32 i_max_remaps, UInt32 i_access_threshold, bool i_cross, bool i_invalid, bool i_mig, UInt32 i_high_temp_thres, UInt32 i_dangerous_temp_thres, UInt32 i_remap_temp_thres, bool i_mea)
+{
+	max_remap_num = i_max_remaps;
+	row_access_threshold = i_access_threshold;
+	cross_finding = i_cross;
+	invalidate_row = i_invalid;
+	migrate_row = i_mig;
+	high_temp_thres = i_high_temp_thres;
+	dangerous_temp_thres = i_dangerous_temp_thres;
+	remap_temp_thres = i_remap_temp_thres;
+	m_stat_unit->temperature_threshold = high_temp_thres;
+	do_mea = i_mea;
+}
+
 double
 RemappingManager::getAverage(std::vector<UInt32> vec)
 {
@@ -399,19 +421,22 @@ RemappingManager::accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 
 	UInt32 bank_idx = vault_i * n_banks + bank_i;
 	UInt32 bank_temp = m_stat_unit->getBankTemp(bank_idx);
 
-	if (m_stat_unit->isLastRemapped(idx)){
+	if (bank_temp <= high_temp_thres && m_stat_unit->isLastRemapped(idx)){
 		hits_on_hot += req_times;
 		c_hit_hot += req_times;
 	}
-	if (bank_temp > 85 && m_stat_unit->isJustRemapped(idx)) {
+	if (bank_temp > high_temp_thres && m_stat_unit->isLastRemapped(idx)) {
 		hits_on_cool += req_times;
+	}
+	if (bank_temp > high_temp_thres) {
+		hot_access += req_times;
+		c_hot_access += req_times;
+	} else {
+		cool_access += req_times;
 	}
 
 	/* Check if there is a hot row */
-	if (bank_temp > 85) {
-		hot_access += req_times;
-		c_hot_access += req_times;
-		
+	if (bank_temp > remap_temp_thres) {
 		if (mea_map.find(idx) != mea_map.end()) {
 			mea_map[idx] ++;
 		} else {
@@ -451,7 +476,6 @@ RemappingManager::accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 
 		if (mea_map.find(idx) != mea_map.end()) {
 			mea_map.erase(idx);
 		}
-		cool_access += req_times;
 	}
 	tot_access += req_times;
 
@@ -467,7 +491,20 @@ RemappingManager::issueRowRemap(UInt32 src, UInt32 des)
 	// invalid = true: invalidation after remapping
 	// invalid = false: migration after remapping
 	UInt32 src_phy = m_remap_table->getPhyIdx(src);
-	bool invalid = false;
+	UInt32 src_v, des_v, src_b, src_r, des_b, des_r;
+
+	splitIdx(src_phy, &src_v, &src_b, &src_r);
+	splitIdx(des, &des_v, &des_b, &des_r);
+	
+	bool invalid = true;
+
+	if (src_v == des_v) {
+		invalid = false;
+	}
+	// Set forced choice
+	if (invalidate_row) invalid = true;
+	if (migrate_row) invalid = false;
+
 	m_remap_table->remapRow(src, des, invalid);
 	m_stat_unit->remapRow(src_phy, des);
 
@@ -485,18 +522,18 @@ RemappingManager::findHottestRow()
 {
 	UInt32 row_nums = n_vaults * n_banks * n_rows;
 	UInt32 hottest = INVALID_TARGET;
-	UInt32 max_access = m_stat_unit->row_access_threshold;
+	UInt32 max_access = row_access_threshold;
 
 	for (UInt32 v_i = 0; v_i < n_vaults; v_i++) {
 		UInt32 vault_temp = m_stat_unit->getVaultTemp(v_i);
-		if (vault_temp <= m_stat_unit->temperature_threshold) continue;
+		if (vault_temp <= remap_temp_thres) continue;
 		for (UInt32 b_i = 0; b_i < n_banks; b_i++) {
 
 			UInt32 phy_bank_idx = v_i * n_banks + b_i;
 
 			UInt32 bank_temp = m_stat_unit->getBankTemp(phy_bank_idx);
 
-			if (bank_temp < m_stat_unit->temperature_threshold) continue;
+			if (bank_temp < remap_temp_thres) continue;
 
 			//UInt32 max_bank_access = 0, tot_bank_access = 0;
 
@@ -541,7 +578,7 @@ UInt32
 RemappingManager::findHottestRowMEA()
 {
 	UInt32 max_idx = INVALID_TARGET;
-	UInt32 max_count = m_stat_unit->row_access_threshold;
+	UInt32 max_count = row_access_threshold;
 
 	//std::cout << "[MEA]Current we have " << mea_map.size() << " in mea map" << std::endl;
 
@@ -552,7 +589,7 @@ RemappingManager::findHottestRowMEA()
 			max_count = i->second;
 		}
 	}
-	if (max_count == m_stat_unit->row_access_threshold) {
+	if (max_count == row_access_threshold) {
 		return INVALID_TARGET;
 	}
 	//std::cout << "[MEA]We found hottest row with " << max_count << std::endl;
@@ -594,7 +631,7 @@ RemappingManager::findTargetInVault(UInt32 src_log)
 			continue;
 		}
 
-		if (d_lev > s_lev && bank_temp < m_stat_unit->temperature_threshold) {
+		if (d_lev > s_lev && bank_temp < remap_temp_thres) {
 			/* Here we only choose 0 access*/
 			if (des_access == 0) {
 				target = des_phy;
@@ -621,7 +658,7 @@ RemappingManager::findTargetCrossVault(UInt32 src_log)
 		for (int v_i = 0; v_i < n_vaults; v_i ++) {
 			UInt32 phy_bank_idx = v_i * n_banks + b_i;
 			UInt32 bank_temp = m_stat_unit->getBankTemp(phy_bank_idx);
-			if (bank_temp >= m_stat_unit->temperature_threshold) continue;
+			if (bank_temp >= remap_temp_thres) continue;
 			for (int r_i = 0; r_i < n_rows; r_i ++) {
 				UInt32 des_phy = this->translateIdx(v_i, b_i, r_i);
 				UInt32 des_log = m_remap_table->getLogIdx(des_phy);
@@ -648,26 +685,36 @@ RemappingManager::tryRemapping(bool remap)
 {
 	/* If we have not entered ROI, just return*/
 
-	int max_remap_times = 5; 
-
 	if (remap == false) return 0;
-	if (hot_access_last == hot_access) return 0;
+	//if (hot_access_last == hot_access) return 0;
 	int remap_times = 0;
-	while (remap_times < max_remap_times) {
+	while (remap_times < max_remap_num) {
 		//std::cout << "hehe\n";
-		//UInt32 src = findHottestRow();
-		UInt32 src = findHottestRowMEA();
+		UInt32 src = INVALID_TARGET;
+		if (do_mea) {
+			src = findHottestRowMEA();
+		} else {
+			src = findHottestRow();
+		}
 		//std::cout << "haha\n";
 
 		/* Check if there is a hot row */
-		bool cross = false;
+		UInt32 target = INVALID_TARGET;
+
 		if (src == INVALID_TARGET) break;
-		UInt32 target = findTargetInVault(src);
-		if (target == INVALID_TARGET) {
+
+		if (cross_finding == false) {
+			target = findTargetInVault(src);
+			if (target == INVALID_TARGET) {
+				target = findTargetCrossVault(src);
+			}
+		} else {
+			cross_remaps ++;
 			target = findTargetCrossVault(src);
-			cross = true;
+			if (target == INVALID_TARGET) {
+				target = findTargetInVault(src);
+			}
 		}
-		if (cross) cross_remaps++;
 		/*
 		UInt32 target = findTargetCrossVault(src);
 		if (target == INVALID_TARGET) {
@@ -699,6 +746,16 @@ RemappingManager::tryRemapping(bool remap)
 	n_intervals ++;
 
 	return remap_times;
+}
+
+bool
+RemappingManager::checkBankHot(UInt32 v, UInt32 b)
+{
+	UInt32 phy_bank_idx = v * n_banks + b;
+	UInt32 bank_temp = m_stat_unit->getBankTemp(phy_bank_idx);
+	if (bank_temp > high_temp_thres)
+	   return true;
+	return false;	
 }
 
 void

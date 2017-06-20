@@ -205,6 +205,8 @@ void resize_thermal_model_grid(grid_model_t *model, int n_units);
 void set_temp_grid (grid_model_t *model, double *temp, double val);
 void dump_top_layer_temp_grid(grid_model_t *model, char *file, grid_model_vector_t *temp);
 void dump_steady_temp_grid (grid_model_t *model, char *file);
+/* dump trace for debug*/
+void dump_temp_trace_grid (grid_model_t *model, double *temp, char *file);
 void dump_temp_grid (grid_model_t *model, double *temp, char *file);
 void copy_temp_grid (grid_model_t *model, double *dst, double *src);
 void read_temp_grid (grid_model_t *model, double *temp, char *file, int clip);

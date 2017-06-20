@@ -62,7 +62,8 @@ class StackedDramPerfUnison {
 
 		/* Remapping Manager (REMAP_MAN)*/
 		RemappingManager* m_remap_manager;
-		bool enable_remap, remapped, enter_roi, bank_level_remap;
+		bool enable_remap, remapped, enter_roi, bank_level_refresh;
+		bool reactive, predictive, no_hot_access;
 		UInt32 v_remap_times, b_remap_times;
 
 		/* Some DRAM statistics*/
@@ -104,8 +105,11 @@ TODO: we need to consider vault parrellelism
 		StackedDramPerfUnison(UInt32 vaults_num, UInt32 vault_size, UInt32 bank_size, UInt32 row_size);
 		~StackedDramPerfUnison();
 
+		/* New Remap Function*/
+		bool getRemapSet(UInt32 set_i, UInt32* remap_set);
 		void splitSetNum(UInt32 set_i, UInt32* vault_i, UInt32* bank_i, UInt32* row_i);
 		UInt32 getSetNum(UInt32 vault_i, UInt32 bank_i, UInt32 row_i);
+
 		SubsecondTime getAccessLatency(SubsecondTime pkt_time, UInt32 pkt_size, UInt32 set_i, DramCntlrInterface::access_t access_type);
 
 		bool checkRowValid(UInt32 vault_i, UInt32 bank_i, UInt32 row_i);

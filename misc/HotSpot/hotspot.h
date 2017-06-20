@@ -45,43 +45,53 @@ int global_config_to_strs(global_config_t *config, str_pair *table, int max_entr
 class Hotspot
 {
 public:
-Hotspot();
-~Hotspot();
+  Hotspot();
+  ~Hotspot();
 
-/*
-* global variables used in initialization 
-*/
+  /*
+  * global variables used in initialization 
+  */
+  int n = 0, num, size, lines = 0, do_transient = TRUE, do_temp_init = TRUE;
 
-int num, size, lines = 0, do_transient = TRUE;
-/* floorplan	*/
-flp_t *flp;
-/* hotspot temperature model	*/
-RC_model_t *model;
-
-/* thermal model configuration parameters	*/
-thermal_config_t thermal_config;
-/* global configuration parameters	*/
-global_config_t global_config;
-/* table to hold options and configuration */
-str_pair table[MAX_ENTRIES];
-
-int do_detailed_3D = FALSE; //BU_3D: do_detailed_3D, false by default
-/*
-* end of global variables 
-*/
+  int first_call = TRUE;
 
 
-/* 
- * called by sniper to calculate temperature
- * need to read init_file, core_layer.flr, power_trace, -model_type grid, -grid_layer_file test_3D.lcf, -grid_steady_file..
- * example: ($1)fft-small ($2)StackedDramCache.input ($3)cache.steady ($4)cache.ttrace ($5)cache.grid.steady 
- *          ../hotspot -c ../hotspot.config -f core_layer.flr -p $1/$2 -steady_file $1/$3 -model_type grid -grid_layer_file test_3D.lcf
- *          ../hotspot -c ../hotspot.config -init_file $1/$3 -f core_layer.flr -p $1/$2 -o $1/$4 -model_type grid -grid_layer_file test_3D.lcf -grid_steady_file $1/$5
- */
-void getNames(const char *file, char **names, int *len);
-void initHotSpot(int argc, char **argv);
-void calculateTemperature(double *temp_rst, int argc, char **argv);
-void endHotSpot();
+  int start_analysis = FALSE;
+  double _start_analysis_threshold = 95;
+  /* floorplan	*/
+  flp_t *flp;
+  /* hotspot temperature model	*/
+  RC_model_t *model;
+
+  /*initial temperature used for model*/
+  double *init_temp;
+
+  /* thermal model configuration parameters	*/
+  thermal_config_t thermal_config;
+  /* global configuration parameters	*/
+  global_config_t global_config;
+  /* table to hold options and configuration */
+  str_pair table[MAX_ENTRIES];
+
+  int do_detailed_3D = FALSE; //BU_3D: do_detailed_3D, false by default
+  /*
+  * end of global variables 
+  */
+
+
+  /* 
+   * called by sniper to calculate temperature
+   * need to read init_file, core_layer.flr, power_trace, -model_type grid, -grid_layer_file test_3D.lcf, -grid_steady_file..
+   * example: ($1)fft-small ($2)StackedDramCache.input ($3)cache.steady ($4)cache.ttrace ($5)cache.grid.steady 
+   *          ../hotspot -c ../hotspot.config -f core_layer.flr -p $1/$2 -steady_file $1/$3 -model_type grid -grid_layer_file test_3D.lcf
+   *          ../hotspot -c ../hotspot.config -init_file $1/$3 -f core_layer.flr -p $1/$2 -o $1/$4 -model_type grid -grid_layer_file test_3D.lcf -grid_steady_file $1/$5
+   */
+  void getNames(const char *file, char **names, int *len);
+  void initHotSpot(int argc, char **argv);
+  void calculateTemperature(double *temp_rst);
+  void endHotSpot();
+  void startAnalysis();
+  void startWarmUp();
 };
 
 #endif
