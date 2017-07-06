@@ -312,7 +312,7 @@ Hotspot::getNames(const char *file, char **names, int *len)
 * init HotSpot
 */
 void 
-Hotspot::initHotSpot(int argc, char **argv)
+Hotspot::initHotSpot(int argc, char **argv, bool use_default_init_temp)
 {
   int i;
   printf("*[Hotspot] begin initialization!\n");
@@ -387,13 +387,18 @@ Hotspot::initHotSpot(int argc, char **argv)
     fatal("unknown model type\n");
 
   /* read init file */
-  if (do_transient && strcmp(model->config->init_file, NULLFILE)) {
+  if (do_transient && strcmp(model->config->init_file, NULLFILE) && use_default_init_temp == false) {
       if (!model->config->dtm_used)	
         read_temp(model, init_temp, model->config->init_file, FALSE);
       else	
         read_temp(model, init_temp, model->config->init_file, TRUE);
-  } else if (do_transient)	
+  } else if (do_transient) {	
     set_temp(model, init_temp, model->config->init_temp);
+  } else if (use_default_init_temp) {
+	  set_temp(model, init_temp, model->config->init_temp);
+  } else {
+	  printf("[Error] cannot init temperature!\n");
+  }
 
   //printf("*[Hotspot] end initialization!\n");
 }
@@ -636,7 +641,7 @@ Hotspot::calculateTemperature(double *temp_rst)
   /* dump steady state temperatures on to file if needed	*/
   if (strcmp(model->config->steady_file, NULLFILE)) {
 	//printf("dump steady temperature to file: %s!\n", model->config->steady_file);
-	dump_temp(model, steady_temp, model->config->steady_file);
+	//dump_temp(model, steady_temp, model->config->steady_file);
 	/* End Warm Up*/
 	//if (steady_max > _start_analysis_threshold + 273.15)
 	 // startAnalysis();

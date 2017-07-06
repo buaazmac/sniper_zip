@@ -87,7 +87,7 @@ public:
    *          ../hotspot -c ../hotspot.config -init_file $1/$3 -f core_layer.flr -p $1/$2 -o $1/$4 -model_type grid -grid_layer_file test_3D.lcf -grid_steady_file $1/$5
    */
   void getNames(const char *file, char **names, int *len);
-  void initHotSpot(int argc, char **argv);
+  void initHotSpot(int argc, char **argv, bool use_default_init_temp);
   void calculateTemperature(double *temp_rst);
   void endHotSpot();
   void startAnalysis();

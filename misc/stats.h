@@ -135,6 +135,7 @@ class StatsManager
 	  std::chrono::steady_clock::time_point last_time_point;
 
 	  bool first_ttrace;
+	  bool start_hotspot;
 
 	  struct BankStatEntry bank_stats[32][8];
 	  UInt64 vault_reads[32], vault_writes[32], vault_row_hits[32];
@@ -144,7 +145,7 @@ class StatsManager
 	  double bank_power[32][8];
 	  double prev_bank_temp[32][8];
 	  double vault_power[32];
-	  double power_L3, power_mc;
+	  double peak_power_proc, dyn_power_proc, power_L3, power_mc;
 	  double power_exe[4], power_ifetch[4], power_lsu[4], power_mmu[4], power_l2[4], power_ru[4], power_ialu[4], power_fpalu[4], power_inssch[4], power_l1i[4], power_insdec[4], power_bp[4], power_l1d[4];
 	  // Record the previous power value for each component
 	  double p_power_L3, p_power_mc;

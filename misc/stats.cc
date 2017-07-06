@@ -165,6 +165,28 @@ StatsManager::init()
 
    /*Initialize log file*/
    power_trace_log.open("power_trace_log.txt");
+	for (int i = 0; i < 4; i++) {
+		power_trace_log << "ialu_" << i << "\t";
+		power_trace_log << "fpalu_" << i << "\t";
+		power_trace_log << "inssch_" << i << "\t";
+		power_trace_log << "l1i_" << i << "\t";
+		power_trace_log << "insdec_" << i << "\t";
+		power_trace_log << "bp_" << i << "\t";
+		power_trace_log << "ru_" << i << "\t";
+		power_trace_log << "l1d_" << i << "\t";
+		power_trace_log << "mmu_" << i << "\t";
+		power_trace_log << "l2_" << i << "\t";
+	}
+	for (int i = 0; i < 32; i++) {
+		power_trace_log << "dram_ctlr_" << i << "\t";
+	}
+	for (int j = 0; j < 8; j++) {
+		for (int i = 0; i < 32; i++) {
+			power_trace_log << "dram_" << i << "_" << j << "\t";
+		}
+	}
+	power_trace_log << std::endl;
+
    temp_trace_log.open(ttrace_file);
 
    /* Set whether to dump trace*/
@@ -238,16 +260,19 @@ StatsManager::init()
    reverse_flp = Sim()->getCfg()->getBoolDefault("perf_model/thermal/reverse", false);
 
    /* Initialization of frequency table for DVFS*/
+   int max_freq = Sim()->getCfg()->getFloat("perf_model/core/frequency") * 1000;
+   int min_freq = max_freq * 0.2;
    int num_freq = Sim()->getCfg()->getInt("perf_model/thermal/freq_num");
-   int freq_step = (2660 - 532) / (num_freq - 1);
+   int freq_step = (max_freq - min_freq) / (num_freq - 1);
    for (int i = 0; i < num_freq - 1; i++) {
-	   freq_table.push_back(532 + freq_step * i);
+	   freq_table.push_back(min_freq + freq_step * i);
    }
-   freq_table.push_back(2660);
+   freq_table.push_back(max_freq);
    freq_lev = freq_table.size() - 1;
    max_lev = freq_table.size() - 1;
 
    first_ttrace = false;
+   start_hotspot = false;
 
 	/*End Init*/
 	printf("----------END_INIT_STATS_MANAGER------------\n");
@@ -439,6 +464,7 @@ StatsManager::computeDramPower(SubsecondTime tACT, SubsecondTime tPRE, Subsecond
 
 	double psys_tot_back = psys_pre_pdn + psys_pre_stby + psys_act_pdn + psys_act_stby + psys_ref + psys_act;
 	double psys_tot_front = double(psys_wr + psys_rd + psys_read_io);
+	
 	return (psys_tot_back / 1000.0 +  psys_tot_front / 1000.0);
 }
 
@@ -626,6 +652,26 @@ void
 StatsManager::updatePower()
 {
 	// Store the current power to previous array
+	int power_scale_int = Sim()->getCfg()->getInt("perf_model/thermal/power_scale");
+	double power_scale = double(power_scale_int) / 10.0;
+	if (power_scale < 1) {
+		std::cout << "[Warning] power scale is less than 1, please check!\n";
+		power_scale = 1;
+	}
+
+
+	peak_power_proc = double(getMetricObject("peak_processor", 0, "power-dynamic")->recordMetric()) * 1.0e-6;
+	dyn_power_proc = double(getMetricObject("processor", 0, "power-dynamic")->recordMetric()) * 1.0e-6;
+	if (power_scale_int == -1) {
+		if (dyn_power_proc != 0) {
+			power_scale = peak_power_proc / dyn_power_proc;
+		} else {
+			power_scale = 1;
+		}
+		std::cout << "[Overall Power Consumption] Peak: " << peak_power_proc 
+				  << ", Dynamic: " << dyn_power_proc << std::endl;
+	}
+
 	p_power_mc = power_mc;
 	for (int i = 0; i < 4; i++) {
 		p_power_exe[i] = power_exe[i];
@@ -643,21 +689,21 @@ StatsManager::updatePower()
 		p_power_l1d[i] = power_l1d[i];
 	}
 
-	power_mc = double(getMetricObject("mc", 0, "power-dynamic")->recordMetric()) * 1.0e-6;
+	power_mc = power_scale * double(getMetricObject("mc", 0, "power-dynamic")->recordMetric()) * 1.0e-6;
 	for (int i = 0; i < 4; i++) {
-		power_exe[i] = double(getMetricObject("exe", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_ifetch[i] = double(getMetricObject("ifetch", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_lsu[i] = double(getMetricObject("lsu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_mmu[i] = double(getMetricObject("mmu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_l2[i] = double(getMetricObject("l2", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_ru[i] = double(getMetricObject("ru", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_ialu[i] = double(getMetricObject("ialu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_fpalu[i] = double(getMetricObject("fpalu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_inssch[i] = double(getMetricObject("inssch", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_l1i[i] = double(getMetricObject("l1i", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_insdec[i] = double(getMetricObject("insdec", i, "power-dynamic")->recordMetric()) * 1.0e-6;
-		power_bp[i] = (double(getMetricObject("btb", i, "power-dynamic")->recordMetric()) + double(getMetricObject("btb", i, "power-dynamic")->recordMetric())) * 1.0e-6;
-		power_l1d[i] = double(getMetricObject("l1d", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_exe[i] = power_scale * double(getMetricObject("exe", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_ifetch[i] = power_scale * double(getMetricObject("ifetch", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_lsu[i] = power_scale * double(getMetricObject("lsu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_mmu[i] = power_scale * double(getMetricObject("mmu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_l2[i] = power_scale * double(getMetricObject("l2", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_ru[i] = power_scale * double(getMetricObject("ru", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_ialu[i] = power_scale * double(getMetricObject("ialu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_fpalu[i] = power_scale * double(getMetricObject("fpalu", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_inssch[i] = power_scale * double(getMetricObject("inssch", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_l1i[i] = power_scale * double(getMetricObject("l1i", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_insdec[i] = power_scale * double(getMetricObject("insdec", i, "power-dynamic")->recordMetric()) * 1.0e-6;
+		power_bp[i] = power_scale * (double(getMetricObject("btb", i, "power-dynamic")->recordMetric()) + double(getMetricObject("btb", i, "power-dynamic")->recordMetric())) * 1.0e-6;
+		power_l1d[i] = power_scale * double(getMetricObject("l1d", i, "power-dynamic")->recordMetric()) * 1.0e-6;
 	}
 
 	/* Set of time interval*/
@@ -791,7 +837,7 @@ StatsManager::dumpHotspotInput()
 	
 	bool record_power = Sim()->getCfg()->getBoolDefault("perf_model/thermal/record_power", false);
 
-	if (record_power) {
+	if (record_power && peak_power_proc > 0.1) {
 		for (int i = 0; i < 4; i++) {
 			power_trace_log
 			<< power_ialu[i] << "\t" 
@@ -963,7 +1009,8 @@ StatsManager::callHotSpot()
 		if (reverse_flp) {
 			argv[12] = "./HotSpot/reverse_3D.lcf";
 		}
-		hotspot->initHotSpot(15, argv);
+		bool use_default_init_temp = Sim()->getCfg()->getBoolDefault("perf_model/thermal/default_init_temp", false);
+		hotspot->initHotSpot(15, argv, use_default_init_temp);
 		//hotspot->startWarmUp();
 		//hotspot->calculateTemperature(unit_temp);
 		//hotspot->endHotSpot();
@@ -1120,8 +1167,10 @@ StatsManager::updateCurrentTime(SubsecondTime t)
 	SubsecondTime time_elasped = m_current_time - m_last_remap_time;
 	if (time_elasped > RemapInterval) {
 		m_last_remap_time = m_current_time;
+		/*
 		if (m_stacked_dram_unison->enter_roi && do_remap)
 			m_stacked_dram_unison->tryRemapping();
+			*/
 	}
 	
 }
@@ -1193,7 +1242,14 @@ StatsManager::recordStats(String prefix)
    start = end;
 
    /* Call HotSpot in Sniper*/
-   callHotSpot();
+   if (dyn_power_proc > 0.001 || start_hotspot) {
+      callHotSpot();
+	  if (start_hotspot == false) {
+		  start_hotspot = true;
+	  }
+   } else {
+	   std::cout << "[Warning] the power of processor is too small, we skip the temperature calculation!\n";
+   }
    end = std::chrono::steady_clock::now();
    //std::cout << "[TIME_REC]Time spent on callHotSpot() is: " << timeDuration(end, start) << std::endl;
    start = end;
