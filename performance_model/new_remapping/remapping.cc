@@ -3,6 +3,8 @@
 BankStat::BankStat(UInt32 id) 
 	: _bank_id(id), _logical_id(id), _physical_id(id)
 {
+	_valid = true;
+	_disabled = false;
 }
 
 BankStat::~BankStat()
@@ -87,8 +89,10 @@ RemappingManager::RemappingManager(StackedDramPerfUnison* dram_perf_cntlr)
 	_n_vaults = dram_perf_cntlr->n_vaults;
 	_n_banks = dram_perf_cntlr->n_banks;
 	_n_rows = dram_perf_cntlr->n_rows;
+
+	_tot_banks = _n_vaults * _n_banks;
 	
-	for (UInt32 i = 0; i < _n_banks; i++) {
+	for (UInt32 i = 0; i < _tot_banks; i++) {
 		struct PhyBank phy_bank;
 		phy_bank._logical_bank = i;
 		phy_bank._temperature = 0;
@@ -190,6 +194,7 @@ bool
 RemappingManager::checkDisabled(UInt32 v, UInt32 b, UInt32 r)
 {
 	UInt32 bank_id = getBankId(v, b);
+	//std::cout << "*** here we check " << v << " " << b << " " << bank_id << std::endl;
 	BankStat* bank = _bank_stat[bank_id];
 	if (bank->_disabled) {
 		return true;
@@ -214,8 +219,9 @@ RemappingManager::accessRow(UInt32 v, UInt32 b, UInt32 r)
 void
 RemappingManager::runMechanism()
 {
-	UInt32 tot_n = _n_vaults * _n_banks;
-	for (UInt32 bank_id = 0; bank_id < tot_n; bank_id++) {
+	UInt32 hot_banks = 0;
+
+	for (UInt32 bank_id = 0; bank_id < _tot_banks; bank_id++) {
 		BankStat* bank = _bank_stat[bank_id];
 		UInt32 phy_bank = bank->_physical_id;
 		double bank_temp = _phy_banks[phy_bank]._temperature;
@@ -226,8 +232,10 @@ RemappingManager::runMechanism()
 				resetBank(bank_id);
 			}
 			if (bank_temp >= _high_thres && !bank->_disabled) {
+				hot_banks ++;
 				// if the bank become hot, disable it
 				bank->setDisabled(true);
+				bank->setValid(false);
 				_phy_banks[phy_bank]._valid = false;
 			}
 		} else if (_n_remap == 1) {
@@ -242,7 +250,7 @@ RemappingManager::runMechanism()
 				UInt32 begin_i = vault_id, end_i = vault_id + _n_banks;
 				// check if we want a global remapping
 				if (_inter_vault) {
-					begin_i = 0; end_i = tot_n;
+					begin_i = 0; end_i = _tot_banks;
 				}
 				
 				for (UInt32 j = begin_i; j < end_i; j++) {
@@ -268,6 +276,7 @@ RemappingManager::runMechanism()
 			std::cout << "[Error] unrecognized policy!\n";
 		}
 	}
+	std::cout << "-----and we disabled " << hot_banks << " hot banks!\n";
 }
 
 void
@@ -301,5 +310,8 @@ RemappingManager::getLogicalIndex(UInt32* v, UInt32* b, UInt32* r)
 	UInt32 bank_id = getBankId(*v, *b);
 	BankStat* bank = _bank_stat[bank_id];
 	UInt32 log_bank = bank->_logical_id;
-	splitId(log_bank, v, b, r);
+
+	UInt32 new_idx = log_bank * _n_rows + *r;
+
+	splitId(new_idx, v, b, r);
 }

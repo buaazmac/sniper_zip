@@ -70,6 +70,7 @@ class RemappingManager {
 public:
 	/* Memory information*/
 	UInt32 _n_vaults, _n_banks, _n_rows;
+	UInt32 _tot_banks;
 	/* Experiment configurations */
 	bool _inter_vault = false;
 	UInt32 _n_remap = 0;

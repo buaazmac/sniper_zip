@@ -462,12 +462,18 @@ TODO:
 	if (set_disabled) {
 		model_delay += m_dram_bandwidth.getRoundedLatency(8 * 64);
 		model_delay += remap_delay;
+
+		// [NEW_EXP]
+		/*
+		std::cout << "*** set_n: " << set_n << std::endl;
 		std::cout << "[NEW_REMAP_DEBUG] here we skip a mem access because of heat!\n";
+		*/
+
 		page_misses ++;
 		page_disabled ++;
 		return model_delay;
 	}
-	// [NEW_EXP] here update the set to remap one
+	/*/ [NEW_EXP] here update the set to remap one */
 	set_n = m_dram_perf_model->getRemapSet(set_n);
 
 	/* Try to acccess cache set*/
@@ -620,6 +626,9 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 	/* handle it once */
 	m_dram_perf_model->remapped = false;
 
+	// [NEW_EXP]
+	std::cout << "-----and here we check remapping results in cache controller!\n";
+
 	//m_dram_perf_model->checkStat(vault_i, bank_i);
 	//m_dram_perf_model->checkDramValid(v_valid_arr, b_valid_arr, b_migrated_arr);
 	UInt32 writeback_blocks = 0, valid_blocks = 0;
@@ -658,12 +667,13 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 				}
 			
 
+				// [NEW_EXP]
 				/*
 				std::cout << "[REMAP_DEBUG] Amazing, we found an invalid row!\n"
 					      << "------wb_blocks: " << set_wb_blocks
 						  << "------valid blocks: " << set_valid_blocks
 						  << std::endl;
-				*/
+						  */
 				
 				valid_blocks += set_valid_blocks;
 				writeback_blocks += set_wb_blocks;

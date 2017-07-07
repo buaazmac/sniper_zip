@@ -194,8 +194,10 @@ StackedDramPerfUnison::getRemapSet(UInt32 set_i)
 	m_remap_manager->getLogicalIndex(&remap_vault, &remap_bank, &remap_row);
 	UInt32 remap_set = getSetNum(remap_vault, remap_bank, remap_row);
 	int n_remap = Sim()->getCfg()->getInt("perf_model/remap_config/n_remap");
-	if (n_remap != 1 && remap_set != set_i)
-		std::cout << "[Error] impossible set number!\n";
+	if (n_remap != 1 && remap_set != set_i) { 
+		std::cout << "[Error] impossible set number!" << set_i << ", " << remap_set << std::endl;
+		printf("%d(%d), %d(%d), %d(%d)\n", vault_i, remap_vault, bank_i, remap_bank, row_i, remap_row);
+	}
 	return remap_set;
 	/*
 	bool phy_valid_bit = m_remap_manager->getPhysicalIndex(&remap_vault, &remap_bank, &remap_row);
@@ -598,6 +600,7 @@ StackedDramPerfUnison::updateTemperature(UInt32 v, UInt32 b, UInt32 temperature,
 	 *    a. m_remap_manager: remap bank
 	 *    b. check row state (valid, migrated(used for optimization), forbid(temperature)) to manage cache data
 	 */
+	std::cout << "[NEW_EXP] here we update temperature!\n";
 	m_remap_manager->runMechanism();
 	remapped = true;
 }
