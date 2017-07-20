@@ -106,7 +106,7 @@ TODO: we need to consider vault parrellelism
 		~StackedDramPerfUnison();
 
 		/* New Remap Function*/
-		bool getRemapSet(UInt32 set_i, UInt32* remap_set);
+		UInt32 getRemapSet(UInt32 set_i);
 		void splitSetNum(UInt32 set_i, UInt32* vault_i, UInt32* bank_i, UInt32* row_i);
 		UInt32 getSetNum(UInt32 vault_i, UInt32 bank_i, UInt32 row_i);
 
@@ -114,6 +114,8 @@ TODO: we need to consider vault parrellelism
 
 		bool checkRowValid(UInt32 vault_i, UInt32 bank_i, UInt32 row_i);
 		bool checkRowMigrated(UInt32 vault_i, UInt32 bank_i, UInt32 row_i);
+		bool checkRowDisabled(UInt32 v, UInt32 b, UInt32 r);
+		bool checkSetDisabled(UInt32 set_i);
 
 		void checkDramValid(bool *valid_arr, UInt32 *b_valid_arr, UInt32 *b_migrated_arr);
 		void checkTemperature(UInt32 idx, UInt32 bank_i);
@@ -124,7 +126,7 @@ TODO: we need to consider vault parrellelism
 		void clearRemappingStat();
 		void updateStats();
 		void clearCacheStats();
-		void updateTemperature(UInt32 v, UInt32 b, UInt32 temperature, UInt32 v_temp);
+		void updateTemperature(UInt32 v, UInt32 b, double temperature, double v_temp);
 
 	private:
 		UInt32 *bankRemap;

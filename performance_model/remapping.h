@@ -20,176 +20,102 @@
 #include <fstream>
 #include <map>
 #include <vector>
+#include <unordered_set>
 
 #define INVALID_TARGET 9999999
 
 class StackedDramPerfUnison;
 
-class RemappingTable {
-	/*
-	n_vaults: number of vaults in 3D DRAM
-	n_banks: number of banks in vault
-	m_table: table of size n_vaults * n_banks
-	entry: v, b, phy_v, phy_b, valid
-
-	operations: remap(x, y) remap x to y
-	*/
+class BankStat {
 public:
-	struct remapping_entry {
-		UInt32 phy, log;
-		bool valid, migrated;
-	};
-	UInt32 n_vaults, n_banks, n_rows;
-	UInt32 n_entries;
-	struct remapping_entry* m_table;
-	RemappingTable(UInt32 vaults, UInt32 banks, UInt32 rows);
-	~RemappingTable();
-
-	void remapRow(UInt32 src, UInt32 des, bool invalid);
-	void remapBank(UInt32 src, UInt32 des, bool invalid);
-	void remapVault(UInt32 src, UInt32 des, bool invalid);
-
-	void setValid(UInt32 idx, bool valid) {m_table[idx].valid = valid;}
-	void setMigrated(UInt32 idx, bool migrated) {m_table[idx].migrated = migrated;}
-
-	UInt32 getPhyIdx(UInt32 idx);
-	UInt32 getLogIdx(UInt32 idx);
-	UInt32 getPhyBank(UInt32 idx);
-	UInt32 getLogBank(UInt32 idx);
-	UInt32 getPhyVault(UInt32 idx);
-	UInt32 getLogVault(UInt32 idx);
-	bool getValid(UInt32 idx);
-	bool getMigrated(UInt32 idx);
-};
-
-class StatStoreUnit {
 	/*
-	n_vaults: number of vaults in 3D DRAM
-	n_banks: number of banks in vault
-	m_table: table of size n_vaults * n_banks
-	entry: v, b, access_count, data_cov, temperature
+	 * bank_id: corresponding to original mapping
+	 * logical_id: usually the same as bank_id, changed to another id when combined
+	 * physical_id: initial same as bank_id, changed to another id when remapped
+	 */
+	UInt32 _bank_id;
+	UInt32 _logical_id, _physical_id, _remap_id;
+	/*
+	 * valid: indicate whether the content of bank is still valid
+	 * disabled: indicate whether the bank is disabled because of high temperature
+	 * valid_rows: add some exceptional rows to optimize the cache miss rate (migrated)
+	 */
+	bool _valid = true, _disabled = false, _combined = false;
+	std::unordered_set<UInt32> valid_rows;
 
-	operations: swap(x,y), clear(x), setAccess(x), setDataCov(x), setTemp(x)
-	getAccess(x), getDataCov(x), getTemp(x)
-	*/
-public:
-	struct stats_entry {
-		UInt32 idx, access_count;
-		bool valid, just_remapped, last_remapped;
-	};
-	UInt32 n_vaults, n_banks, n_rows;
-	UInt32 temperature_threshold;
+	/* MEA map*/
+	std::map<UInt32, UInt32> mea_map;
+	UInt32 _n_migrate_row = 10;
 
-	UInt32 max_remap_num;
-	UInt32 row_access_threshold;
-	bool cross_finding;
-	bool invalidate_row;
-	bool migrate_row;
+	/* Statistics */
+	long remap_times = 0, disabled_times = 0, invalidate_times = 0;
 
-	const UInt32 bank_access_threshold = 1000;
-	const UInt32 vault_access_threshold = 3000;
-	UInt32 n_entries;
-	struct stats_entry* m_table;
+	/* Constructor */
+	BankStat(UInt32 id);
+	~BankStat();
 
-	UInt32* vault_temperature;
-	UInt32* bank_temperature;
-	StatStoreUnit(UInt32 vaults, UInt32 banks, UInt32 rows);
-	~StatStoreUnit();
-
-	void clear(UInt32 idx);
-	void enableRemap(UInt32 idx);
-
-	void swap(UInt32 x, UInt32 y);
-	void remapRow(UInt32 src, UInt32 des);
-	void remapBank(UInt32 src, UInt32 des);
-	void remapVault(UInt32 src, UInt32 des);
-	void setAccess(UInt32 idx, UInt32 x) {m_table[idx].access_count = x;}
-	void setControllerTemp(UInt32 v, UInt32 x);
-	void setBankTemp(UInt32 v, UInt32 b, UInt32 x);
-	void enableRemapping(UInt32 idx) {m_table[idx].just_remapped = false;};
-
-	UInt32 getAccess(UInt32 idx);
-	UInt32 getTemp(UInt32 idx);
-	bool isTooFreq(UInt32 idx);
-	bool isJustRemapped(UInt32 idx);
-	bool isLastRemapped(UInt32 idx);
-
-	UInt32 getBankTemp(UInt32 bank_i);
-	UInt32 getBankAccess(UInt32 bank_i);
-	UInt32 getVaultAccess(UInt32 vault_i);
-	UInt32 getVaultTemp(UInt32 vault_i);
-	bool isBankTooFreq(UInt32 bank_i);
-	bool isVaultTooHot(UInt32 vault_i);
-	bool isVaultTooFreq(UInt32 vault_i);
+	/* Methods of management */
+	void accessRow(UInt32 row_id);
+	void remapTo(UInt32 phy_bank_id, bool disabled);
+	void combineWith(BankStat* target_bank);
+	void migrateRow(UInt32 row_id);
+	void setValid(bool valid) {_valid = valid;}
+	void setDisabled(bool disabled) {_disabled = disabled;}
+	void setId(UInt32 log_id, UInt32 phy_id);
+	void finishRemapping();
 
 };
 
 class RemappingManager {
-	/*
-	m_remap_table, m_stat_unit;
-	UInt32 findTarget();
-	void issueRemap(UInt32 src, UInt32 des);
-	bool checkStat(UInt32 v, UInt32 b, bool remap);
-	void getPhysicalIndex(UInt32* v_i, UInt32* b_i); // return a physical global bank index, (useful for both remapping table structure)
-	*/
 public:
-	UInt32 max_remap_num;
-	UInt32 row_access_threshold;
-	bool cross_finding;
-	bool invalidate_row;
-	bool migrate_row;
-	bool do_mea;
-	UInt32 high_temp_thres, dangerous_temp_thres, remap_temp_thres;
+	/* Memory information*/
+	UInt32 _n_vaults, _n_banks, _n_rows;
+	UInt32 _tot_banks;
+	/* Experiment configurations */
+	bool _inter_vault = false;
+	UInt32 _n_remap = 0;
+	UInt32 _high_thres, _dangerous_thres, _remap_thres;
+	UInt32 _init_temp;
+	/*physical bank table*/
+	struct PhyBank {
+		UInt32 _logical_bank;
+		double _temperature;
+		bool _valid;
+		long _hot_access, _cool_access, _remap_access;
+	};
+	vector<PhyBank> _phy_banks;
+	vector<BankStat*> _bank_stat;
 
-	UInt32 n_vaults, n_banks, n_rows;
-	UInt32 tot_access, hot_access, cool_access;
-	UInt32 tot_access_last, hot_access_last, cool_access_last, hits_on_hot, hits_on_cool, tot_remaps, cross_remaps, n_intervals;
-	RemappingTable *m_remap_table;
-	StatStoreUnit *m_stat_unit;
-	/* MEA map*/
-	std::map<UInt32, UInt32> mea_map;
-	const int max_mea_size = 128;
-	/* More Fine-grained Results*/
-	std::vector<UInt32> hot_access_vec, hit_hot_vec, hot_remap_vec;
-	UInt32 c_hot_access, c_hit_hot, c_hot_remap;
+	
 
-	StackedDramPerfUnison* m_dram_perf_cntlr;
+	StackedDramPerfUnison* _m_dram_perf_cntlr;
 
 	RemappingManager(StackedDramPerfUnison* dram_perf_cntlr);
 	~RemappingManager();
 
-	void setRemapConfig(UInt32 i_max_remaps, UInt32 i_access_threshold, bool i_cross, bool i_invalid, bool i_mig, UInt32 ht, UInt32 dt, UInt32 rt, bool i_mea);
+	void setRemapConfig(UInt32 n_remaps, bool inter_vault, UInt32 ht, UInt32 dt, UInt32 rt, UInt32 it);
 	
-	double getAverage(std::vector<UInt32> vec);
+	void updateTemperature(UInt32 v, UInt32 b, double temp);
 
-	bool getPhysicalIndex(UInt32* vault_i, UInt32* bank_i, UInt32* row_i);
-	void accessRow(UInt32 vault_i, UInt32 bank_i, UInt32 row_i, UInt32 req_times);
-	void issueRowRemap(UInt32 src, UInt32 des);
-
-	bool checkRowStat(UInt32 v, UInt32 b, UInt32 r);
-	UInt32 findHottestRow();
-	UInt32 findHottestRowMEA();
-	UInt32 findTargetInVault(UInt32 src_log);
-	UInt32 findTargetCrossVault(UInt32 src_log);
-	UInt32 tryRemapping(bool remap);
-
-	bool checkBankStat(UInt32 v, UInt32 b) {return false;};
-	bool checkVaultStat(UInt32 v, UInt32 b) {return false;};
-	bool checkStat(UInt32 v, UInt32 b, bool remap) {return false;};
-
-	bool checkBankHot(UInt32 v, UInt32 b);
-	void updateTemperature(UInt32 v, UInt32 b, UInt32 temp, UInt32 v_temp);
-
-	void reset(UInt32 v, UInt32 b, UInt32 r);
-	void resetStats();
-	void finishRemapping();
-	void enableAllRemap();
+	void resetBank(UInt32 bank_id);
+	void resetStats(bool reset);
 
 	bool checkMigrated(UInt32 v, UInt32 b, UInt32 r);
 	bool checkValid(UInt32 v, UInt32 b, UInt32 r);
+	bool checkDisabled(UInt32 v, UInt32 b, UInt32 r);
+	/* Access a row: update bank stats */
+	void accessRow(UInt32 v, UInt32 b, UInt32 r);
 
-	void splitIdx(UInt32 idx, UInt32* v, UInt32* b, UInt32* r);
-	UInt32 translateIdx(UInt32 v, UInt32 b, UInt32 r);
+	/* Do remapping-based thermal management */
+	void runMechanism();
+	
+
+	/* Get the index information: bank, row...*/
+
+	void splitId(UInt32 idx, UInt32* v, UInt32* b, UInt32* r);
+	UInt32 getBankId(UInt32 v, UInt32 b);
+	void getPhysicalIndex(UInt32* v, UInt32* b, UInt32* r);
+	void getLogicalIndex(UInt32* v, UInt32* b, UInt32* r);
 };
 
 #endif

@@ -177,10 +177,28 @@ StatsManager::init()
 		power_trace_log << "mmu_" << i << "\t";
 		power_trace_log << "l2_" << i << "\t";
 	}
+
+	// 2.5D test
+	power_trace_log << "airgap0\t";
+
 	for (int i = 0; i < 32; i++) {
 		power_trace_log << "dram_ctlr_" << i << "\t";
 	}
 	for (int j = 0; j < 8; j++) {
+		// 2.5D test
+		if (j % 2 == 0) {
+			int air_gap_num = j / 2;
+			if (air_gap_num == 0) {
+				power_trace_log << "airgap1\t";
+			} else if (air_gap_num == 1) {
+				power_trace_log << "airgap2\t";
+			} else if (air_gap_num == 2) {
+				power_trace_log << "airgap3\t";
+			} else if (air_gap_num == 3) {
+				power_trace_log << "airgap4\t";
+			}
+		}
+
 		for (int i = 0; i < 32; i++) {
 			power_trace_log << "dram_" << i << "_" << j << "\t";
 		}
@@ -851,10 +869,14 @@ StatsManager::dumpHotspotInput()
 			<< power_mmu[i] << "\t" 
 			<< power_l2[i] << "\t";
 		}
+		power_trace_log << "0\t";
 		for (int i = 0; i < 32; i++) {
 			power_trace_log << vault_power[i] << "\t";
 		}
 		for (int j = 0; j < 8; j++) {
+			if (j % 2 == 0) {
+				power_trace_log << "0\t";
+			}
 			for (int i =0; i < 32; i++) {
 				power_trace_log << bank_power[i][j] << "\t";
 			}
@@ -1113,8 +1135,8 @@ StatsManager::callHotSpot()
 			 * Here we set vault controller temperature
 			 * to any bank in the vault (because of temperature sensor)
 			 */
-			int vault_temp = int(unit_temp[40 + v_i]),
-				bank_temp = int(unit_temp[i]);
+			double vault_temp = unit_temp[40 + v_i],
+				bank_temp = unit_temp[i];
 			m_stacked_dram_unison->updateTemperature(v_i, b_i, bank_temp, vault_temp);
 			if (prev_bank_temp[v_i][b_i] > 85) {
 				hot_access[v_i][b_i] += tmp->reads + tmp->writes;
@@ -1155,6 +1177,8 @@ StatsManager::callHotSpot()
 	//if (cache_misses != 0)
 	//	miss_rate = double(cache_misses) / double(cache_reads + cache_writes);
 
+	/*[NEW_EXP] call management*/
+	m_stacked_dram_unison->tryRemapping();
 	m_stacked_dram_unison->clearCacheStats();
 }
 

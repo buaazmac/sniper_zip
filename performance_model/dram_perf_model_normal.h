@@ -134,8 +134,11 @@ class StackDramCacheCntlrUnison
 			int misses;
 		} dram_stats[32];
 
+      TimeDistribution* m_dram_access_cost;
+
 		DramCacheSetInfoUnison* m_set_info;
 		DramCacheSetUnison** m_set;
+		bool* m_set_thermal_valid;
 
 		UInt32 FHT[31];	// footprint history table
 
@@ -149,7 +152,7 @@ class StackDramCacheCntlrUnison
 		UInt32 m_bank_size;
 		UInt32 m_row_size;
 
-		UInt32 cache_access, page_misses, block_misses;
+		UInt32 cache_access, page_misses, block_misses, page_disabled;
 		UInt32 cache_access_no_roi, page_misses_no_roi, block_misses_no_roi;
 		UInt32 wb_blocks, ld_blocks;
 		UInt32 invalid_times, invalid_blocks, migrate_times, migrate_blocks;
@@ -165,8 +168,10 @@ class StackDramCacheCntlrUnison
 		StackDramCacheCntlrUnison(UInt32 set_num, UInt32 associativity, UInt32 blocksize, UInt32 pagesize);
 		~StackDramCacheCntlrUnison();
 
-		SubsecondTime ProcessRequest(SubsecondTime pkt_time, DramCntlrInterface::access_t access_type, IntPtr address, ShmemPerf *perf);
+		SubsecondTime ProcessRequest(SubsecondTime pkt_time, UInt64 pkt_size, DramCntlrInterface::access_t access_type, IntPtr address, ShmemPerf *perf);
+		/* Functions to handle remapping */
 		SubsecondTime checkRemapping(SubsecondTime pkt_time, ShmemPerf *perf);
+		void invalidateBank();
 
 		SubsecondTime handleDramAccess(SubsecondTime pkt_time, UInt32 pkt_size, UInt32 set_n, DramCntlrInterface::access_t access_type, ShmemPerf *perf);
 
