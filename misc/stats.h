@@ -96,6 +96,10 @@ class StatsManager
       void init();
       void recordStats(String prefix);
 
+	  /* Frequency Vector*/
+	  std::vector<UInt64> freq_table; // MHz
+	  int freq_lev, max_lev;
+
 	  /* get temperature of DRAM components*/
 	  void updateCurrentTime(SubsecondTime t);
 	  double getDramCntlrTemp(UInt32 vault_num);
@@ -158,9 +162,6 @@ class StatsManager
 	  char **unit_names;
 	  double *unit_temp;
 
-	  /* Frequency Vector*/
-	  std::vector<UInt64> freq_table; // MHz
-	  int freq_lev, max_lev;
 
 	  const char *ttrace_file = "./test_ttrace.txt";
 	  int ttrace_num;

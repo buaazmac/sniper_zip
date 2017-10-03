@@ -335,17 +335,22 @@ StackDramCacheCntlrUnison::StackDramCacheCntlrUnison(
 
 	// Initialize dram performance model
 	// we have 32 vaults, 1 vault = 128 mb, 1 bank = 16 mb, 1 row = 8 kb
+	UInt32 cache_size = Sim()->getCfg()->getInt("perf_model/dram_cache/cache_size");
+	cache_size *= 1024;
+
 	m_vault_num = 32;
-	m_vault_size = 128 * 1024;
-	m_bank_size = 16 * 1024;
+	m_vault_size = cache_size / m_vault_num;
+	m_bank_size = m_vault_size / 8;
 	m_row_size = 8;
 	// Statistics for simulating memory operation
 	cache_access = page_misses = block_misses = wb_blocks = ld_blocks = 0;
+	load_on_page_miss = write_on_page_miss = 0;
 	page_disabled = 0;
 	// Statistics for simulating remapping
 	invalid_times = invalid_blocks = migrate_times = migrate_blocks = 0;
 	// Choose Invalidation/Migration mechanism
 	remap_invalid = true;
+
 
 	m_dram_perf_model = new StackedDramPerfUnison(m_vault_num, m_vault_size, m_bank_size, m_row_size);
 
@@ -380,10 +385,13 @@ StackDramCacheCntlrUnison::~StackDramCacheCntlrUnison()
 		miss_rate_roi = (float)tot_miss_roi / (float)cache_access_roi;
 
 	std::cout << "\n ***** [DRAM_CACHE_Result] *****\n\n";
-	std::cout << "*** DRAM Total Access: " << cache_access 
+	std::cout << "Number of memory pages: " << page_table.size() << std::endl;
+	std::cout << "*** DRAM Total Access: " << cache_access
+			  << ", page disabled: " << page_disabled
 			  << ", page miss: " << page_misses << ", block misses: " << block_misses
 			  << ", miss: " << tot_miss << ", miss rate: " << miss_rate 
 			  << std::endl;
+	std::cout << "Block load on page miss: " << load_on_page_miss << ", Block write back on page miss: " << write_on_page_miss << std::endl;
 	std::cout << "*** DRAM Total Access In ROI: " << cache_access_roi
 			  << ", miss: " << tot_miss_roi << ", miss rate: " << miss_rate_roi
 			  << std::endl;
@@ -466,36 +474,49 @@ TODO:
 	cache_access ++;
 	
 	SubsecondTime dram_access_cost = m_dram_access_cost->next();
-	SubsecondTime orig_dram_access_cost = dram_access_cost;
-	int l_fac = Sim()->getCfg()->getInt("perf_model/dram/latency_factor");
-	for (int i = 0; i < l_fac - 1; i++)
-		dram_access_cost += orig_dram_access_cost;
+	int avg_queue_latency_ns = Sim()->getCfg()->getInt("perf_model/dram/avg_queue_latency");
+	SubsecondTime avg_queue_latency = SubsecondTime::NS(avg_queue_latency_ns);
 
+	SubsecondTime orig_dram_access_cost = dram_access_cost;
+
+	bool enable_remap = m_dram_perf_model->enable_remap;
+	int n_remap = Sim()->getCfg()->getInt("perf_model/remap_config/n_remap");
+	bool global_remap = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/inter_vault", false);
+	bool on_top = Sim()->getCfg()->getBoolDefault("perf_model/stacked_dram/on_top", true);
+	if (enable_remap) {
+		if (n_remap == 1 && global_remap) {
+			dram_delay += SubsecondTime::PS(200);
+		} else {
+			dram_delay += SubsecondTime::PS(10);
+		}
+	}
+
+	//std::cout << dram_access_cost.getNS() << " " << pkt_size << std::endl;
+	bool dram_disabled = Sim()->getCfg()->getBoolDefault("perf_model/stacked_dram/disabled", false);
 	bool set_disabled = m_dram_perf_model->checkSetDisabled(set_n);
-	if (set_disabled) {
+	if (set_disabled || dram_disabled) {
 		model_delay += m_dram_bandwidth.getRoundedLatency(8 * pkt_size);
 		model_delay += dram_access_cost;
 		model_delay += remap_delay;
+		model_delay += dram_delay;
+		model_delay += avg_queue_latency;
 
-		// [NEW_EXP]
-		/*
-		std::cout << "*** set_n: " << set_n << std::endl;
-		std::cout << "[NEW_REMAP_DEBUG] here we skip a mem access because of heat!\n";
-		*/
-
-		page_misses ++;
+		block_misses ++;
 		page_disabled ++;
+
+		/**/
+		Sim()->getStatsManager()->updateCurrentTime(pkt_time + model_delay);
 		
 		return model_delay;
+	}
+	if (on_top) {
+		avg_queue_latency = SubsecondTime::Zero();
+	} else {
+		avg_queue_latency = avg_queue_latency / 4;
 	}
 	/*/ [NEW_EXP] here update the set to remap one */
 	set_n = m_dram_perf_model->getRemapSet(set_n);
 
-	int n_remap = Sim()->getCfg()->getInt("perf_model/remap_config/n_remap");
-	bool global_remap = Sim()->getCfg()->getBoolDefault("perf_model/remap_config/inter_vault", false);
-	if (n_remap == 1 && global_remap) {
-		dram_delay += SubsecondTime::PS(200);
-	}
 
 	/* Try to acccess cache set*/
 	/* If you want to map two sets to one set 
@@ -545,44 +566,36 @@ TODO:
 		wb_blocks += writeback_blocks;
 		ld_blocks += load_blocks;
 
+		load_on_page_miss += load_blocks;
+		write_on_page_miss += writeback_blocks;
+
 		m_set[set_n]->updateReplacementIndexTag(index, page_tag, pc, page_offset, footprint);
 
 		/* Write Back Dirty Blocks*/
 		//dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64 * writeback_blocks, set_n, DramCntlrInterface::WRITE); 
-		dram_delay += handleDramAccess(pkt_time, 64 * load_blocks, set_n, DramCntlrInterface::WRITE, perf); 
-		dram_delay += handleDramAccess(pkt_time, 64 * writeback_blocks, set_n, DramCntlrInterface::READ, perf); 
-		/* Load New Blocks from Memory*/
 
-		// calculate model delay (page load): load a page (1 page = 1984 B)
-		// 1 write = 2 read
-		//model_delay += m_dram_bandwidth.getRoundedLatency(1984);
-		//model_delay += m_dram_bandwidth.getRoundedLatency(1984);
-		//model_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * writeback_blocks);
-		//model_delay += dram_access_cost * load_blocks;
+		/*TODO: here we disable*/
+		//dram_delay += handleDramAccess(pkt_time, 64 * load_blocks, set_n, DramCntlrInterface::WRITE, perf); 
+		dram_delay += handleDramAccess(pkt_time, 64, set_n, DramCntlrInterface::READ, perf); 
 	} else if (hit == 1) { // page is in cache, but block is not
 		block_misses ++;
-		// we need to load block from memory
-		// we also need to update page's footprint
 		
-		// calculate model delay (block load): load a block
-	    //model_delay += m_dram_bandwidth.getRoundedLatency(64);
-	    //model_delay += m_dram_bandwidth.getRoundedLatency(64);
-		//dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, DramCntlrInterface::WRITE); 
-		dram_delay += handleDramAccess(pkt_time, 64, set_n, DramCntlrInterface::WRITE, perf); 
-		//model_delay += m_dram_bandwidth.getRoundedLatency(8 * 64);
-
+		/*TODO: here we disable*/
+		//dram_delay += handleDramAccess(pkt_time, 64, set_n, DramCntlrInterface::WRITE, perf); 
 
 		load_blocks ++;
-		//model_delay += m_dram_bandwidth.getRoundedLatency(8 * 64);
 	} 
 
 	//dram_delay += m_dram_perf_model->getAccessLatency(pkt_time, 64, set_n, access_type); 
-	dram_delay += handleDramAccess(pkt_time, 64, set_n, access_type, perf); 
 
 	/* Here we update memory access delays*/
-	mem_access_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * load_blocks);
-	mem_access_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * writeback_blocks);
-	//model_delay += dram_access_cost * (load_blocks + writeback_blocks);
+	if (load_blocks > 0) {
+		mem_access_delay += m_dram_bandwidth.getRoundedLatency(8 * 64);
+		//mem_access_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * writeback_blocks);
+		model_delay += (dram_access_cost + avg_queue_latency);
+	} else {
+		dram_delay += handleDramAccess(pkt_time, 64, set_n, access_type, perf); 
+	}
 
 
 	UInt32 vault_bit = floorLog2(m_vault_num);
@@ -634,6 +647,7 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 	UInt32 bank_num = (1 << bank_bit);
 	UInt32 vault_num = m_vault_num;
 
+
 	if (m_dram_perf_model->enter_roi == false) {
 		cache_access_no_roi = cache_access;
 		page_misses_no_roi = page_misses;
@@ -650,13 +664,21 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 
 
 	// [NEW_EXP]
-	std::cout << "-----and here we check remapping results in cache controller!\n";
+	//std::cout << "-----and here we check remapping results in cache controller!\n";
 
 	//m_dram_perf_model->checkStat(vault_i, bank_i);
 	//m_dram_perf_model->checkDramValid(v_valid_arr, b_valid_arr, b_migrated_arr);
 	UInt32 writeback_blocks = 0, valid_blocks = 0;
 	
 	UInt32 cnt = 0, invalid_cnt = 0;
+
+	vector<SubsecondTime> cntlr_delay;
+	for (UInt32 i = 0; i < vault_num; i++) {
+		cntlr_delay.push_back(SubsecondTime::Zero());
+	}
+
+
+	//SubsecondTime dram_access_cost = m_dram_access_cost->next();
 
 	for (UInt32 vault_i = 0; vault_i < vault_num; vault_i++) {
 		for (UInt32 bank_i = 0; bank_i < bank_num; bank_i++) {
@@ -681,16 +703,22 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 				if (!valid) {
 					//std::cout << "invalid!\n";
 					/* Latency for invalidation */
-					dram_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * set_wb_blocks);
-					dram_delay += handleDramAccess(pkt_time, set_wb_blocks * 64, set_i, DramCntlrInterface::READ, perf); 
+					//dram_delay += m_dram_bandwidth.getRoundedLatency(8 * 64 * set_wb_blocks);
+					cntlr_delay[vault_i] += m_dram_bandwidth.getRoundedLatency(8 * 64 * set_wb_blocks);
+					/*Overlapped by buss*/
+					//dram_delay += handleDramAccess(pkt_time, 8 * set_wb_blocks * 64, set_i, DramCntlrInterface::READ, perf); 
+					cntlr_delay[vault_i] += handleDramAccess(pkt_time, 8 * set_wb_blocks * 64, set_i, DramCntlrInterface::READ, perf); 
+					//dram_delay += dram_access_cost * set_wb_blocks;
 					m_set[set_i]->invalidateContent();
 					invalid_times ++;
 					invalid_blocks += set_wb_blocks;
 				} else if (migrated) {
 					//std::cout << "migrated!\n";
 					/* Latency for migration */
-					dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::READ, perf); 
-					dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE, perf); 
+					cntlr_delay[vault_i] += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::READ, perf); 
+					cntlr_delay[vault_i] += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE, perf); 
+					//dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::READ, perf); 
+					//dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::WRITE, perf); 
 					/*
 					dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::TRANS, perf); 
 					dram_delay += handleDramAccess(pkt_time, set_valid_blocks * 64, set_i, DramCntlrInterface::TRANS, perf); 
@@ -713,6 +741,13 @@ StackDramCacheCntlrUnison::checkRemapping(SubsecondTime pkt_time, ShmemPerf *per
 			}
 		}
 	}
+	// Paralellize the remapping operations
+	// find out a maximum delay in all controllers
+	for (UInt32 i = 0; i < vault_num; i++) {
+		if (cntlr_delay[i] > dram_delay) {
+			dram_delay = cntlr_delay[i];
+		}
+	}
 	m_dram_perf_model->clearRemappingStat();
 	//m_dram_perf_model->updateStats();
 
@@ -731,6 +766,8 @@ SubsecondTime
 StackDramCacheCntlrUnison::handleDramAccess(SubsecondTime pkt_time, UInt32 pkt_size, UInt32 set_n, DramCntlrInterface::access_t access_type, ShmemPerf *perf) {
 	int bandwidth = 128;
 	bandwidth = Sim()->getCfg()->getInt("perf_model/stacked_dram/bandwidth");
+	int obus_delay = Sim()->getCfg()->getInt("perf_model/stacked_dram/obus_delay");
+	bool on_top = Sim()->getCfg()->getBoolDefault("perf_model/stacked_dram/on_top", true);
 	int req_times = pkt_size / bandwidth;
 	if (req_times < 1) {
 		req_times = 1;
@@ -743,6 +780,9 @@ StackDramCacheCntlrUnison::handleDramAccess(SubsecondTime pkt_time, UInt32 pkt_s
 		Sim()->getStatsManager()->updateCurrentTime(pkt_time + delay);
 		perf->updateTime(pkt_time, ShmemPerf::DRAM_QUEUE);
 		perf->updateTime(pkt_time + delay);
+	}
+	if (on_top == false) {
+		delay += SubsecondTime::NS(obus_delay);
 	}
 	return delay;
 }
@@ -808,7 +848,10 @@ DramPerfModelNormal::DramPerfModelNormal(core_id_t core_id,
    /*
 	  Initialize a dram cache controller
 	  */
-   m_dram_cache_cntlr = new StackDramCacheCntlrUnison(StackedDramSize/StackedSetSize, StackedAssoc, StackedBlockSize, StackedPageSize);
+   UInt32 stacked_dram_size = Sim()->getCfg()->getInt("perf_model/dram_cache/cache_size");
+   stacked_dram_size *= 1024;
+   //m_dram_cache_cntlr = new StackDramCacheCntlrUnison(StackedDramSize/StackedSetSize, StackedAssoc, StackedBlockSize, StackedPageSize);
+   m_dram_cache_cntlr = new StackDramCacheCntlrUnison(stacked_dram_size/StackedSetSize, StackedAssoc, StackedBlockSize, StackedPageSize);
 }
 
 DramPerfModelNormal::~DramPerfModelNormal()
@@ -825,6 +868,11 @@ DramPerfModelNormal::~DramPerfModelNormal()
 SubsecondTime
 DramPerfModelNormal::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf)
 {
+	SubsecondTime processing_time = m_dram_bandwidth.getRoundedLatency(8 * pkt_size);
+	//if (m_queue_model) {
+		//SubsecondTime queue_delay = m_queue_model->computeQueueDelay(pkt_time, 8 * processing_time, requester);
+		//std::cout << "queue delay: " << queue_delay.getNS() << std::endl;
+	//}
 	//std::cout << "[DRAM_PERF_MODEL] before process a request\n";
 	SubsecondTime model_delay = SubsecondTime::Zero();
 	model_delay += m_dram_cache_cntlr->ProcessRequest(pkt_time, pkt_size, access_type, address, perf);

@@ -29,6 +29,9 @@ DramModel::DramModel(const std::string& fname)
 	/* interval ticks initialization*/
 	interval_ticks = 500000;
 	tot_ticks = 0;
+
+	/* */
+	recent_read_latency = recent_write_latency = memory->spec->read_latency;
 }
 
 DramModel::~DramModel()
@@ -52,6 +55,18 @@ DramModel::~DramModel()
 	}
 	*/
 	std::cout << "[RAMULATOR OUTPUT]" << std::endl;
+
+	std::cout << std::endl << "[Latency-related OUTPUT]" << std::endl;
+	if (n_updates > 0) {
+		avg_req_num /= n_updates;
+		avg_update_time /= n_updates;
+		avg_mem_latency = avg_mem_latency / (2 * n_updates);
+	}
+	std::cout << "Total updates: " << n_updates << std::endl;
+	std::cout << "Average number of requests during one update: " << avg_req_num << std::endl;
+	std::cout << "Average time between two updates: " << avg_update_time << std::endl;
+	std::cout << "Average memory latency: " << avg_mem_latency << std::endl;
+	std::cout << std::endl << "[Latency-related OUTPUT]" << std::endl;
 }
 
 /*Test the functionality of our code*/
@@ -163,14 +178,63 @@ void DramModel::setBankRef(int vault, int bank, bool hot)
 	memory->ctrls[vault]->setBankRef(bank, hot);
 }
 
-int DramModel::getReadLatency(int vault)
+int DramModel::getReadLatency(int vault, int bank, int row, int col, uint64_t pkt_time)
 {
-	int rd_latency = memory->spec->read_latency;
-	if (rd_latency < memory->ctrls[vault]->read_latency_avg.value()) {
-		rd_latency = memory->ctrls[vault]->read_latency_avg.value();
+	//int rd_latency = memory->spec->read_latency;
+	Request req = {0, vault, bank, row, col};
+	//req_queue.push_back(req);
+	if (pkt_time - last_req_time > 200) { // update r/w latency
+		updateLatency(pkt_time);
 	}
-	rd_latency = memory->spec->read_latency;
-	return rd_latency;
+	return recent_read_latency;
+}
+int DramModel::getWriteLatency(int vault, int bank, int row, int col, uint64_t pkt_time)
+{
+	//int rd_latency = memory->spec->read_latency;
+	Request req = {1, vault, bank, row, col};
+	req_queue.push_back(req);
+	if (pkt_time - last_req_time > 200) { // update r/w latency
+		updateLatency(pkt_time);
+	}
+	return recent_write_latency;
+}
+void DramModel::updateLatency(uint64_t pkt_time)
+{
+	if (pkt_time - last_req_time < 200) {
+		return;
+	}
+	//std::cout << req_queue.size() << std::endl;
+	uint64_t elapse_time = pkt_time - last_req_time;
+	n_updates++;
+	avg_update_time += elapse_time;
+	avg_req_num += req_queue.size();
+
+	last_req_time = pkt_time;
+
+	int read_clks = 0, write_clks = 0, n_reads = 0, n_writes = 0;
+	for (Request req : req_queue) {
+		bool stall = true;
+		n_reads = (req.type == 0) ? n_reads + 1 : n_reads;
+		n_writes = (req.type == 1) ? n_writes + 1 : n_writes;
+		while (stall) {
+			if (req.type == 0) {
+				read_clks++;
+				stall = this->readRow(req.vault, req.bank, req.row, req.col);
+			} else {
+				write_clks++;
+				stall = this->writeRow(req.vault, req.bank, req.row, req.col);
+			}
+		}
+	}
+	req_queue.clear();
+	req_queue.shrink_to_fit();
+
+	recent_read_latency = (n_reads == 0) ? 0 : read_clks / n_reads;
+	recent_write_latency = (n_writes == 0) ? 0 : write_clks / n_writes;
+	recent_read_latency += memory->spec->read_latency;
+	recent_write_latency += memory->spec->read_latency;
+
+	avg_mem_latency += recent_read_latency + recent_write_latency;
 }
 
 int DramModel::getPrevLatency()

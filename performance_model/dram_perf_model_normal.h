@@ -152,7 +152,11 @@ class StackDramCacheCntlrUnison
 		UInt32 m_bank_size;
 		UInt32 m_row_size;
 
+		bool has_disabled = false;
+		int cache_access_after_disabled = 0;
+
 		UInt32 cache_access, page_misses, block_misses, page_disabled;
+		UInt32 load_on_page_miss, write_on_page_miss;
 		UInt32 cache_access_no_roi, page_misses_no_roi, block_misses_no_roi;
 		UInt32 wb_blocks, ld_blocks;
 		UInt32 invalid_times, invalid_blocks, migrate_times, migrate_blocks;

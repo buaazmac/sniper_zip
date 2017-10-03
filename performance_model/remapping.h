@@ -83,6 +83,7 @@ public:
 		bool _valid;
 		long _hot_access, _cool_access, _remap_access;
 	};
+	int remap_times = 0, disable_times = 0, double_disable_times = 0, recovery_times = 0;
 	vector<PhyBank> _phy_banks;
 	vector<BankStat*> _bank_stat;
 

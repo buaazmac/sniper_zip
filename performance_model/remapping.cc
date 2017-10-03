@@ -127,6 +127,8 @@ RemappingManager::~RemappingManager()
 	printf("----[REMAP OUTPUT]---\n");
 	printf("*****HotAccess: %ld\n*****CoolAccess: %ld\n*****RemapAccess: %ld\n",
 			tot_hot_access, tot_cool_access, tot_remap_access);
+	printf("*****SingleDisableTime: %d\n*****DoubleDisableTime: %d\n*****RemapTime: %d\n*****RecoveryTime: %d\n",
+			disable_times, double_disable_times, remap_times, recovery_times);
 	printf("---------------------\n");
 }
 
@@ -228,7 +230,6 @@ bool
 RemappingManager::checkDisabled(UInt32 v, UInt32 b, UInt32 r)
 {
 	UInt32 bank_id = getBankId(v, b);
-	//std::cout << "*** here we check " << v << " " << b << " " << bank_id << std::endl;
 	BankStat* bank = _bank_stat[bank_id];
 	return bank->_disabled;
 }
@@ -275,6 +276,8 @@ RemappingManager::runMechanism()
 			if (bank_temp < _remap_thres && bank->_disabled) {
 				cool_banks ++;
 
+				recovery_times ++;
+
 				//printf("^^Coolbank! We can enable it! ID(%d), TEMP(%.3lf)\n", bank_id, bank_temp);
 				// if the bank become cooler, then enable it
 				resetBank(bank_id);
@@ -282,7 +285,8 @@ RemappingManager::runMechanism()
 			if (bank_temp >= _high_thres && !bank->_disabled) {
 				hot_banks ++;
 
-				//printf("^^Hotbank! Disable it! ID(%d), TEMP(%.3lf)\n", bank_id, bank_temp);
+				disable_times ++;
+			//	printf("^^Hotbank! Disable it! ID(%d), TEMP(%.3lf)\n", bank_id, bank_temp);
 
 				// if the bank become hot, disable it
 				bank->setDisabled(true);
@@ -294,7 +298,8 @@ RemappingManager::runMechanism()
 
 				//if ((logical_bank != bank_id) || (bank->_disabled)) {
 				//[DUBUG]
-				std::cout << "Enable: " << bank_id << ", " << physical_bank << ", " << logical_bank << std::endl;
+				//std::cout << "Enable: " << bank_id << ", " << physical_bank << ", " << logical_bank << std::endl;
+				recovery_times ++;
 
 					cool_banks++;
 					resetBank(bank_id);
@@ -332,7 +337,8 @@ RemappingManager::runMechanism()
 					flag = false;
 				} else {
 					// [DEBUG]
-					std::cout << "Remapp " << bank->_physical_id << " to " << target << std::endl;
+					remap_times++;
+					//std::cout << "Remapp " << bank->_physical_id << " to " << target << std::endl;
 					remap_banks ++;
 					flag = true;
 					BankStat* target_bank = _bank_stat[target];
@@ -357,7 +363,8 @@ RemappingManager::runMechanism()
 							// One bank with a bank remapped to it
 
 							// [DEBUG]
-							std::cout << "Disable combined: " << bank->_physical_id << ", " << bank->_remap_id << std::endl;
+							//std::cout << "Disable combined: " << bank->_physical_id << ", " << bank->_remap_id << std::endl;
+							double_disable_times++;
 
 							// set remapped bank disabled
 							remap_bank->setDisabled(true);
@@ -370,9 +377,11 @@ RemappingManager::runMechanism()
 							// hope that bank is cool...
 						}
 					} else {
-						std::cout << "[Debug] Failed to find a target!\n";
+						//std::cout << "[Debug] Failed to find a target!\n";
 							// [DEBUG]
-							std::cout << "Disable single: " << bank->_logical_id << std::endl;
+							//std::cout << "Disable single: " << bank->_logical_id << std::endl;
+						disable_times++;
+
 						bank->setDisabled(true);
 						bank->setValid(false);
 						_phy_banks[physical_bank]._valid = false;
@@ -386,9 +395,9 @@ RemappingManager::runMechanism()
 			std::cout << "[Error] unrecognized policy!\n";
 		}
 	}
-	std::cout << "-----and we found " << hot_banks << " hot banks!\n";
-	std::cout << "-----and we remap " << remap_banks << " hot banks!\n";
-	std::cout << "-----and we enabled " << cool_banks << " banks!\n";
+	//std::cout << "-----and we found " << hot_banks << " hot banks!\n";
+	//std::cout << "-----and we remap " << remap_banks << " hot banks!\n";
+	//std::cout << "-----and we enabled " << cool_banks << " banks!\n";
 }
 
 void

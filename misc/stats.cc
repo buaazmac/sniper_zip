@@ -1265,6 +1265,10 @@ StatsManager::recordStats(String prefix)
    //std::cout << "[TIME_REC]Time spent on dumpHotspotInput() is: " << timeDuration(end, start) << std::endl;
    start = end;
 
+
+   //Debug
+     // callHotSpot();
+
    /* Call HotSpot in Sniper*/
    if (dyn_power_proc > 0.001 || start_hotspot) {
       callHotSpot();

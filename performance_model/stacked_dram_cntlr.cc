@@ -280,10 +280,10 @@ StackedDramPerfUnison::getAccessLatency(
 						DramCntlrInterface::access_t access_type)
 {
 	// bandwidth of DRAM, decides how many request we need
-	int bandwidth = 128;
-	bandwidth = Sim()->getCfg()->getInt("perf_model/stacked_dram/bandwidth");
+	int max_block = 128;
+	max_block = Sim()->getCfg()->getInt("perf_model/stacked_dram/max_block");
 	
-	int req_times = pkt_size / bandwidth;
+	int req_times = pkt_size / max_block;
 	if (req_times < 1) {
 		req_times = 1;
 	}
@@ -346,10 +346,11 @@ StackedDramPerfUnison::getAccessLatency(
 	if (pkt_time < last_req) {
 		clk_elasped = 0;
 	}
-	if (clk_elasped > 1e6) {
+	if (clk_elasped > 1e4) {
 		//std::cout << "[Ramulator] Too many ticks required!\n";
-		clk_elasped = 1e6;
+		clk_elasped = 1e4;
 	}
+	/*
 	if (first_req) {
 		first_req = false;
 	} else {
@@ -357,11 +358,13 @@ StackedDramPerfUnison::getAccessLatency(
 			m_dram_model->tickOnce();
 		}
 	}
+	*/
 	/* Set the current time for ramulator
 	TODO: More concrete 
 	*/
 	UInt32 tot_clks = 0, idle_clks = 0;
-	last_req = pkt_time;
+	if (pkt_time > last_req)
+		last_req = pkt_time;
 	/*
 TODO: Here we need to handle memory request with physical index
 	   */
@@ -384,31 +387,27 @@ TODO: Here we need to handle memory request with physical index
 		bool stall = true;
 		UInt32 clks = 0;
 		if (access_type == DramCntlrInterface::READ) {
-			stall = !m_dram_model->readRow(remapVault, remapBank, remapRow, 0);
+			//stall = !m_dram_model->readRow(remapVault, remapBank, remapRow, 0);
 			m_dram_model->tickOnce();
-			clks++;
+			clks += m_dram_model->getReadLatency(remapVault, remapBank, remapRow, 0, pkt_time.getNS());
+			/*
 			while (stall) {
-
-				/* (REMAP_MAN) Here we update statistics store unit*/
-				//m_remap_manager->accessRow(vault_i, bank_i, row_i);
-
 				stall = !m_dram_model->readRow(remapVault, remapBank, remapRow, 0);
 				m_dram_model->tickOnce();
 				clks++;
 			}
+			*/
 		} else if (access_type == DramCntlrInterface::WRITE) {
-			stall = !m_dram_model->writeRow(remapVault, remapBank, remapRow, 0);
+			//stall = !m_dram_model->writeRow(remapVault, remapBank, remapRow, 0);
 			m_dram_model->tickOnce();
-			clks++;
+			clks += m_dram_model->getWriteLatency(remapVault, remapBank, remapRow, 0, pkt_time.getNS());
+			/*
 			while (stall) {
-
-				/* (REMAP_MAN) Here we update statistics store unit*/
-				//m_remap_manager->accessRow(vault_i, bank_i, row_i);
-
 				stall = !m_dram_model->writeRow(remapVault, remapBank, remapRow, 0);
 				m_dram_model->tickOnce();
 				clks++;
 			}
+			*/
 		} else {
 			// Transfer is a 2-clocks command
 			clks += 2;
@@ -419,13 +418,27 @@ TODO: Here we need to handle memory request with physical index
 		//clks += m_dram_model->getPrevLatency();
 		//int prev_latency = m_dram_model->getPrevLatency();
 		//std::cout << "Previous latency is: " << prev_latency << std::endl;
-		clks += m_dram_model->getReadLatency(remapVault);
-
-		UInt64 latency_ns = UInt64(m_dram_model->tCK) * clks;
+		//clks += m_dram_model->getReadLatency(remapVault);
+		//for (int i = 0; i < m_dram_model->getReadLatency(remapVault); i++) {
+		//	m_dram_model->tickOnce();
+		//}
+		double tCK = m_dram_model->tCK;
+		double current_freq_level = Sim()->getStatsManager()->freq_lev;
+		double current_freq = Sim()->getStatsManager()->freq_table[current_freq_level];
+		bool on_top = Sim()->getCfg()->getBoolDefault("perf_model/stacked_dram/on_top", true);
+		if (on_top) {
+			tCK = 1000.0 / current_freq;
+		}
+		UInt64 latency_ns = tCK * clks;
+		//UInt64 latency_ns = UInt64(m_dram_model->tCK) * clks;
 		process_latency += SubsecondTime::NS(latency_ns);
 
 		tot_clks += clks;
 	}
+	int bandwidth_3d = Sim()->getCfg()->getInt("perf_model/stacked_dram/bandwidth");
+	int rounded_latency_ns = pkt_size / bandwidth_3d;
+	rounded_latency_ns += 1;
+	//process_latency += Subsecond::NS(rounded_latency);
 	return process_latency;
 }
 

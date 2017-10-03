@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <functional>
 #include <map>
+#include <vector>
 
 /* Standards */
 #include "HBM.h"
@@ -21,6 +22,18 @@ using namespace ramulator;
 
 class DramModel {
 public:
+	struct Request {
+		int type;
+		int vault, bank, row, col;
+	};
+	vector<Request> req_queue;
+	int recent_read_latency, recent_write_latency;
+	uint64_t last_req_time = 0;
+	int n_updates = 0;
+	double avg_req_num = 0;
+	double avg_update_time;
+	double avg_mem_latency = 0;
+
 	DramModel();
 	DramModel(const std::string& fname);
 	~DramModel();
@@ -52,7 +65,9 @@ public:
 
 	/* The unit of all time stats is "NS" */
 
-	int getReadLatency(int vault);
+	int getReadLatency(int vault, int bank, int row, int col, uint64_t pkt_time);
+	int getWriteLatency(int vault, int bank, int row, int col, uint64_t pkt_time);
+	void updateLatency(uint64_t pkt_time);
 	int getPrevLatency();
 
 	uint64_t getTotTime();
